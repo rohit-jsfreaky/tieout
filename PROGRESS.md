@@ -8,10 +8,27 @@
 - **Phase 1 (world) is DONE.** Its finish line passes: one command starts the ERP (:8701),
   the VendorLink portal (:8702) and the AP inbox (:8703); `curl :8701/invoices` returns 40;
   a real browser signs into the portal and reads "95" off delivery note DN-1042;
-  `tieout reset` puts the world back to the seed. 18 tests green, ruff clean.
-  Detail in `backend/PROGRESS.md`.
-- **Next:** Phase 2 (`engine`) in AO session S2 — `tieout match` must find exactly the five
-  seeded exceptions and class them, without reading the seed's own exception table.
+  `tieout reset` puts the world back to the seed. Detail in `backend/PROGRESS.md`.
+- **Phase 2 (engine) is DONE.** Its finish line passes: `tieout demo` runs all four beats
+  from a fresh reset, and `pytest backend/tests -q` is green — 38 tests, three of which
+  drive a real Chromium against the real portal. ruff clean.
+  - `tieout match` finds exactly the five seeded exceptions with a real three-way match and
+    never reads the seed's answer table (a test enforces that).
+  - `tieout work E1` gathers ERP facts, the vendor email and the portal delivery note with a
+    screenshot, and proposes a short-pay at 100% confidence.
+  - `tieout decide E1 approve --by "Chris, Controller"` creates `SHORT-SHIP-01 v1`, stamped
+    with the name and the date; `tieout work E2` is then **auto-cleared, citing that rule and
+    Chris**, without a login — it reuses the saved VendorLink session.
+  - `tieout work E5` **refuses** and lists the eight places it looked.
+  - Real numbers from the run: 5 found, 1 human touch, 1 auto-cleared, 1 refused,
+    16 evidence items, 3 screenshots, 1 active policy, 1 citation.
+- **Two model findings from Phase 2 still need to go into `RESEARCH.md` by hand** (that file
+  has uncommitted edits in the main checkout, so S2 left it alone): `enable_thinking: false`
+  makes `glm-4-7-flash` answer in 2.9 s instead of 19.7 s, and empty content is now retried
+  with a doubled token budget rather than a longer wait. Both written up in
+  `backend/PROGRESS.md` -> "Model notes".
+- **Next:** Phase 3 (`api`) in AO session S3 — a thin FastAPI over `engine.investigate.work`
+  plus the SSE stream. The event sink the API needs already exists.
 
 ## Before the window — 2026-09-03
 
@@ -71,6 +88,11 @@ Open AO. Session S1 on the `world` module. Read `backend/PLAN.md`. Go.
   model live: `gemma-4-31b`. Rate limits 15 rpm / 20k tpm. First real call passed and exposed
   two gotchas now written into RESEARCH.md: the model fences its JSON, and it guessed the
   wrong YEAR for a date — both would have poisoned the evidence trail silently.
+- **2026-09-05 (S2, `engine`)** — Phase 2 built inside the window: the three-way match, the
+  audit trail, the three sources (including the browser), the confidence checklists, the
+  refusal, the policy loop and `tieout demo`. 38 tests green, ruff clean. The loop works on
+  the real world: one approval from Chris, Controller, and the second short-ship cleared
+  itself citing `SHORT-SHIP-01 v1` and his name, with no login and no human.
 - **2026-09-05 (S1, `world`)** — Phase 1 built inside the window: seed + ERP + portal + inbox
   + one-command runner + `tieout reset`, 18 tests. The fake company is Kestrel Manufacturing
   Co. buying from 8 suppliers; 40 invoices, 35 clean, 5 broken on purpose. The portal is one

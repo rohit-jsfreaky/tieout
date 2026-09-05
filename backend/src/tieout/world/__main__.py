@@ -71,8 +71,30 @@ def _banner(host: str) -> str:
     return "\n".join(lines)
 
 
-def serve(host: str = HOST, verbose: bool = False) -> int:
-    """Start all three services and block until interrupted."""
+@dataclass
+class Running:
+    """Three live services on daemon threads, and the handle that stops them."""
+
+    servers: list[uvicorn.Server]
+    threads: list[threading.Thread]
+
+    @property
+    def alive(self) -> bool:
+        return any(thread.is_alive() for thread in self.threads)
+
+    def stop(self) -> None:
+        for server in self.servers:
+            server.should_exit = True
+        for thread in self.threads:
+            thread.join(timeout=5)
+
+
+class WorldNotStarted(RuntimeError):
+    """A port was busy. Better to say so than to serve half a company."""
+
+
+def start_background(host: str = HOST, verbose: bool = False) -> Running:
+    """Start all three services without blocking. ``tieout demo`` runs the world this way."""
     seed.ensure_world()
     servers = [_server(service, host, verbose) for service in SERVICES]
     threads = [
@@ -88,29 +110,34 @@ def serve(host: str = HOST, verbose: bool = False) -> int:
             break
         time.sleep(0.05)
 
+    running = Running(servers=servers, threads=threads)
     if not all(server.started for server in servers):
-        stalled = [
+        stalled = ", ".join(
             service.name
             for service, server in zip(SERVICES, servers, strict=True)
             if not server.started
-        ]
-        names = ", ".join(stalled)
-        print(f"Could not start: {names}. Is the port already in use?", flush=True)
-        for server in servers:
-            server.should_exit = True
+        )
+        running.stop()
+        raise WorldNotStarted(f"Could not start: {stalled}. Is the port already in use?")
+    return running
+
+
+def serve(host: str = HOST, verbose: bool = False) -> int:
+    """Start all three services and block until interrupted."""
+    try:
+        running = start_background(host=host, verbose=verbose)
+    except WorldNotStarted as exc:
+        print(str(exc), flush=True)
         return 1
 
     print(_banner(host), flush=True)
     try:
-        while any(thread.is_alive() for thread in threads):
+        while running.alive:
             time.sleep(0.2)
     except KeyboardInterrupt:
         print("\n  Closing the office.", flush=True)
     finally:
-        for server in servers:
-            server.should_exit = True
-        for thread in threads:
-            thread.join(timeout=5)
+        running.stop()
     return 0
 
 
