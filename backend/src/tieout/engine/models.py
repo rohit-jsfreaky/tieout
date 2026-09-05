@@ -330,6 +330,7 @@ class Metrics(BaseModel):
 
     exceptions_found: int = 0
     worked: int = 0
+    open_not_worked: int = 0
     auto_cleared: int = 0
     refused: int = 0
     awaiting_human: int = 0

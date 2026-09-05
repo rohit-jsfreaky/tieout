@@ -2,7 +2,39 @@
 
 > Working memory for this folder. Read first, update before ending every session.
 
-## Current state — 2026-09-06 (AO session S3, `api` module)
+## Current state — 2026-09-06 (AO session S5, harden + ship)
+
+- **Nothing is being built here any more.** S5 hardened what exists and wrote the root
+  `README.md`. `pytest backend/tests -q` is **46 green**, `ruff check` and `ruff format` clean.
+- **`tieout reset` + `tieout demo` was run five times from cold.** Runs 2–5 were
+  byte-identical; run 1 differed only in the E1 rationale paragraph, which is model prose.
+  Every reproducible thing was identical in all five. ~22 s a run.
+- **Two changes to the engine, both from Rohit:**
+  - **`RATIONALE_SYSTEM` in `model.py` was inverting the finding.** On E4 it wrote "Exception
+    E4 is invalid because the supplier confirmed there is no order number" — backwards. The
+    prompt now states that the exception is an established finding raised by a deterministic
+    three-way match, forbids valid/invalid/unfounded/false-positive, and fixes the order of
+    the paragraph; the user message now opens "Confirmed exception E4 ... / What did not tie
+    out". Verified over three consecutive E4 runs: "Invoice INV-3039 ... did not tie out
+    because it lacked an order number". Fixed in the prompt, not filtered afterwards.
+  - **`Metrics.open_not_worked`** — the exceptions nobody has picked up yet. `worked` and
+    `open_not_worked` always add up to `exceptions_found`, so the counters can no longer show
+    5 found and 3 worked and quietly lose the other 2. It is in `metrics.compute`, in
+    `_print_metrics` ("Open, not yet worked"), and asserted in `test_api.py` and
+    `test_policy_loop.py`. Note the contract it exposes: straight after `POST /reset` the
+    store is empty, so **every counter is 0 until something runs the match** (`GET /queue` or
+    `tieout match`). That is honest — Tieout has found nothing because it has not looked — but
+    it is a real ordering requirement for any client, and it caught the desk out.
+- **`tieout work E3` and `tieout work E4` after a reset**: both propose at 100% confidence
+  (`approve`, and `attach_po`). Neither needs the browser — their checklists are satisfied
+  after the inbox.
+- **The no-key path was verified** (`tieout demo` with `MODEL_API_KEY` empty). Identical: the
+  counters that matter, and the rule's id, version, condition, action, approver, `learned_from`
+  and citation. Different: the rule's human-readable name and rationale (code prose), and
+  `evidence_items` — **12 instead of 16**, because the model splits a vendor email into up to
+  three claims where the code records it verbatim as one.
+
+## Earlier — 2026-09-06 (AO session S3, `api` module)
 
 - **Phase 1 (world), Phase 2 (engine) and Phase 3 (api) are all DONE.**
 - The Phase 3 finish line passes: **the four beats run through `curl` alone**, with the SSE
@@ -212,10 +244,10 @@ escape attempts. It is what the desk's live browser panel draws.
   without Chromium. It is a transport knob, not a rule.
 - **No `/health` route.** `PLAN.md` lists eight; eight is what exists.
 
-## Model notes — new, and NOT yet in RESEARCH.md
+## Model notes — now IN RESEARCH.md (moved there by S5, 2026-09-06)
 
-`RESEARCH.md` has uncommitted edits in Rohit's main checkout, so this session did not touch
-it. **Two findings from this phase are worth adding there by hand:**
+These two are gotchas 3 and 4 under "Model provider" in `RESEARCH.md`, along with a fifth one
+S5 found (the model inverting a finding in the rationale). Kept here for the record:
 
 1. **`chat_template_kwargs: {"enable_thinking": false}` turns the reasoning off** on
    TensorMux's `glm-4-7-flash`, and this is the single biggest reliability win of the phase.
@@ -243,6 +275,8 @@ that feeds it 2024 and expects a rejection).
 
 ## Session log
 
+- **2026-09-06 (S5, harden + ship)** — five cold demo runs, `work E3`/`work E4`, the no-key
+  path. Fixed the rationale prompt and added `open_not_worked`. 46 tests green, ruff clean.
 - **2026-09-03** — folders created, plans written. No code.
 - **2026-09-04** — merged into a single backend project.
 - **2026-09-05 (S1, `world`)** — Phase 1 built and finished: seed, ERP, portal, inbox, runner,

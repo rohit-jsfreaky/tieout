@@ -198,6 +198,7 @@ export interface Policy {
 export interface Metrics {
   exceptions_found: number;
   worked: number;
+  open_not_worked: number;
   auto_cleared: number;
   refused: number;
   awaiting_human: number;

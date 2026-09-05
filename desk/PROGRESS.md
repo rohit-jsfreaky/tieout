@@ -2,7 +2,34 @@
 
 > Working memory for this folder. Read first, update before ending every session.
 
-## Current state — 2026-09-06
+## Current state — 2026-09-06 (after S5's hardening pass)
+
+- **The four beats were driven through this screen five consecutive times** against a live
+  `python -m tieout.api` and a real Chromium, from a Reset each round. Identical counters every
+  round — **5 exceptions · 2 still open · 1 human touch · 1 auto-cleared · 1 refused ·
+  16 evidence items · 3 screenshots** — and **no page errors of any kind**. Those are now the
+  same numbers `tieout demo` prints; the earlier note about the evidence count moving between
+  runs was measured before the fixes below and does not hold any more.
+- **Two staleness bugs the repeated runs exposed, both in `lib/useDesk.ts`, both fixed:**
+  1. **The whole counter strip could read `0` after Reset.** `loadBoard` asked for `/queue`,
+     `/policies` and `/metrics` in one `Promise.all`. But `/queue` is the call that runs the
+     three-way match and fills the engine's store, and `/metrics` only counts what is in it —
+     so straight after a reset the counters could answer from an empty store. The queue is now
+     awaited first and the counters read after it. (This screen also promised "empty reads —,
+     never 0"; that promise was being broken by the ordering, not by the components.)
+  2. **The counters lagged a whole beat behind the screen.** A run cleared `pending` the moment
+     the stream said `done`, then refetched — so the refusal was readable on screen next to
+     "Refused 0" for as long as the refetch took. `pending` now clears in a `.finally()` after
+     the board and the pack have both come back, which also keeps the buttons disabled until
+     what they act on is current.
+  - Reads of the board are also numbered now, so the one fired when a run *starts* cannot land
+    after the one fired when it *ends* and put the previous beat's counters back.
+- **A seventh counter: "Still open"** — the exceptions nobody has picked up yet
+  (`Metrics.open_not_worked`). Asked for by Rohit: the strip showed 5 found without ever
+  saying that 2 of them had not been touched. Seven fit the strip comfortably at 1600px.
+- `npm run typecheck`, `npm run lint` and `npm run build` clean.
+
+## Earlier — 2026-09-06
 
 - **4a, 4b, 4c and 4d are DONE.** The four beats can be driven from the screen with no
   terminal open, against a live `python -m tieout.api` on :8700. `npm run typecheck`,
@@ -84,8 +111,8 @@ it is a `FileResponse` over `engine.sources.portal.screenshot_dir()`, and
 
 ## Next action
 
-Nothing in this folder. Phase 4 is done. What is left is Rohit's: the README, the video and
-the Discord post.
+Nothing in this folder. Phase 4 is done and hardened, and the README is written. What is left
+is Rohit's: the video and the Discord post.
 
 ## Decisions made
 
@@ -123,6 +150,9 @@ None.
 
 ## Session log
 
+- **2026-09-06 (S5, harden + ship)** — five full passes of the four beats through the screen,
+  driven by a throwaway Playwright harness against a live API and a real Chromium. Fixed the
+  two staleness bugs above and added the "Still open" counter. Typecheck, lint and build clean.
 - **2026-09-03** — folder created, plan written. No code.
 - **2026-09-05** — 4a built: Next 16.3.4 skeleton, design system ported from Cairn with new
   fonts and a new accent, empty four-zone layout, typed API stubs. Verified with a real

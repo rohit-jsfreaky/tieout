@@ -237,7 +237,11 @@ def test_reset_puts_the_world_and_the_memory_back(client: TestClient) -> None:
     client.get("/queue")
     messages = _work_and_watch(client, "E4", portal=False)
     assert "proposed" in _kinds(messages) or "refused" in _kinds(messages)
-    assert client.get("/metrics").json()["worked"] == 1
+    counted = client.get("/metrics").json()
+    assert counted["worked"] == 1
+    # Worked plus still-open is always the number found: the two nobody picked up are counted.
+    assert counted["open_not_worked"] == 4
+    assert counted["worked"] + counted["open_not_worked"] == counted["exceptions_found"]
 
     body = client.post("/reset").json()
     assert body["world"]["counts"]["invoices"] == 40
@@ -247,6 +251,8 @@ def test_reset_puts_the_world_and_the_memory_back(client: TestClient) -> None:
     assert counters["evidence_items"] == 0
     assert counters["policies_active"] == 0
     assert client.get("/queue").json()["count"] == 5
+    # Matched again from an empty memory: five found, none worked, all five still open.
+    assert client.get("/metrics").json()["open_not_worked"] == 5
 
 
 def test_the_screenshot_a_fact_points_at_is_served_as_bytes(client: TestClient) -> None:

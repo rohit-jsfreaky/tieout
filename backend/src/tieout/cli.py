@@ -171,6 +171,7 @@ def _print_metrics(counters: Metrics) -> None:
     rows = [
         ("Exceptions found", counters.exceptions_found),
         ("Worked", counters.worked),
+        ("Open, not yet worked", counters.open_not_worked),
         ("Human touches", counters.human_touches),
         ("Auto-cleared by a learned rule", counters.auto_cleared),
         ("Human touches avoided", counters.touches_avoided_by_policy),

@@ -3,7 +3,42 @@
 > Read this first, every session. Update it before ending the session.
 > Per-folder detail: `backend/PROGRESS.md`, `desk/PROGRESS.md`.
 
-## Current state — 2026-09-06
+## Current state — 2026-09-06 (S5, `harden + ship`)
+
+- **Phase 5 is DONE except the video and the Discord post.** No code left, no open bugs.
+  - **`README.md` is written**, to the hackathon checklist. Every number in it came out of a
+    run on this machine and the command that produces it is printed next to it. The only
+    figures not measured here are the AP industry statistics, and the README says so.
+  - **`tieout reset` + `tieout demo`, five times from cold.** Runs 2–5 were byte-identical to
+    each other; run 1 differed only in the E1 rationale paragraph, which is model prose.
+    Every reproducible thing — facts, steps, checklists, the rule, the citation, all twelve
+    counters — was identical in all five. ~22 s a run.
+  - **`tieout work E3` and `tieout work E4` after a reset**: both propose at 100% confidence
+    (approve, and attach_po).
+  - **The four beats through the desk, five times** against a live `python -m tieout.api` and
+    a real Chromium: identical counters every round, no page errors, and the desk's counters
+    now match what `tieout demo` prints exactly (16 evidence items, 3 screenshots).
+  - **`pytest backend/tests` 46 green, ruff clean; desk typecheck, lint and build clean.**
+- **Rohit's two findings are fixed.**
+  - E4's rationale said "Exception E4 is invalid because the supplier confirmed there is no
+    order number" — backwards. `RATIONALE_SYSTEM` in `engine/model.py` now says the exception
+    is an established finding from a deterministic match, forbids the valid/invalid framing
+    and fixes the order of the paragraph. It now reads "Invoice INV-3039 ... did not tie out
+    because it lacked an order number". Written up in `RESEARCH.md` as gotcha 5.
+  - **`open_not_worked` is a new counter** — the exceptions nobody has picked up yet. It is on
+    `Metrics`, in `tieout metrics` and `tieout demo` ("Open, not yet worked"), on the desk
+    ("Still open"), and asserted in `test_api.py` and `test_policy_loop.py`.
+- **Two bugs the five desk passes found, both in `desk/lib/useDesk.ts`, both fixed:**
+  1. **The counter strip could read all zeros after Reset.** `loadBoard` asked for `/queue`,
+     `/policies` and `/metrics` in one `Promise.all` — but `/queue` is the call that runs the
+     three-way match and fills the store, so `/metrics` could answer from an empty one. The
+     queue is now read first, the counters after it.
+  2. **The counters lagged a whole beat behind the screen** — "Not confident" on screen next
+     to "Refused 0" — because a run cleared `pending` before its refetch landed. `pending` now
+     clears only when the board and the pack have come back.
+- **Left for Rohit:** the demo video and the Discord post. Nothing else.
+
+## Earlier today — 2026-09-06
 
 - **Phase 4 (desk) is DONE. All four phases are done.** Its finish line passes: **the four
   beats can be driven from the screen with nothing else open** — no terminal, no curl, no
@@ -109,6 +144,11 @@ Open AO. Session S1 on the `world` module. Read `backend/PLAN.md`. Go.
 
 ## Session log
 
+- **2026-09-06 (S5, `harden + ship`)** — five cold `tieout demo` runs, five passes through the
+  desk, `work E3`/`work E4`, the no-key path, and the README. Fixed Rohit's two findings and
+  two staleness bugs the repeated desk runs exposed. Added `open_not_worked` end to end.
+  46 tests green, ruff clean, desk typecheck/lint/build clean. The two Phase 2 model findings
+  and a new fifth one are now in `RESEARCH.md`.
 - **2026-09-06 (S4, `desk`)** — Phase 4 finished inside the window: steps 4b, 4c and 4d,
   plus a live browser panel that was not in the plan. The desk's types were reconciled
   against the real `engine/models.py` (4a had guessed them from `backend/PLAN.md` and got

@@ -226,12 +226,20 @@ def facts_from_text(
 # Job 2 — the rationale for a decision the code has already made
 # --------------------------------------------------------------------------------------
 
+# The exception is a finding, not a claim to be adjudicated. Left to itself the model wrote
+# "Exception E4 is invalid because the supplier confirmed there is no order number", which is
+# backwards: the supplier confirming it is exactly what makes the exception real. Naming that
+# failure in the prompt is cheaper and more honest than filtering the prose afterwards.
 RATIONALE_SYSTEM = (
     "You are Tieout, an accounts payable agent writing the one-paragraph justification that "
     "goes on an audit trail. The decision and the numbers are already fixed and you must not "
-    "change them. Write four sentences at most: what is wrong, what the evidence shows and "
-    "where it came from, and why the proposed action follows. Plain English, no bullet "
-    "points, no headings, no invented facts."
+    "change them. The exception itself is already established: a deterministic three-way "
+    "match raised it, so it is a confirmed finding and never a claim for you to judge. Never "
+    "call the exception valid, invalid, unfounded or a false positive, and never open with a "
+    "verdict on it. Evidence that agrees with the exception CONFIRMS it. Write four sentences "
+    "at most, in this order: what did not tie out, what the evidence shows and which source "
+    "it came from, and why the proposed action follows from that evidence. Plain English, no "
+    "bullet points, no headings, no invented facts."
 )
 
 
@@ -251,8 +259,8 @@ def draft_rationale(
     )
     user = (
         f"{_dateline(today)}\n\n"
-        f"Exception {case.id} on invoice {case.invoice_id} from {case.vendor_name}.\n"
-        f"Class: {case.kind.value}. {case.headline}\n"
+        f"Confirmed exception {case.id} on invoice {case.invoice_id} from {case.vendor_name}.\n"
+        f"What did not tie out - class {case.kind.value}: {case.headline}\n"
         f"Invoice total {case.amount:,.2f} {case.currency}; "
         f"unsupported amount {case.exposure:,.2f} {case.currency}.\n\n"
         f"Evidence on the trail:\n{evidence}\n\n"

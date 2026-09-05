@@ -57,6 +57,10 @@ def test_approve_once_and_the_next_one_clears_itself(sources, cases) -> None:
     # The counters tell the same story, counted from the store.
     counters = metrics.compute()
     assert counters.human_touches == 1
+    # E1 and E2 are worked; E3, E4 and E5 are still open, and the counters say so.
+    assert counters.worked == 2
+    assert counters.open_not_worked == 3
+    assert counters.worked + counters.open_not_worked == counters.exceptions_found
     assert counters.auto_cleared == 1
     assert counters.touches_avoided_by_policy == 1
     assert counters.policy_citations == 1
