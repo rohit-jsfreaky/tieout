@@ -1,7 +1,15 @@
 import type { NextConfig } from "next";
 
+/**
+ * Almost nothing to configure. The desk is a thin client: no images to optimise
+ * (screenshots are live artefacts served straight from the API), no rewrites, no
+ * server code beyond the one page.
+ *
+ * The dev indicator is off because it sits exactly where the approver field is,
+ * and this screen gets recorded from `next dev`.
+ */
 const nextConfig: NextConfig = {
-  /* config options here */
+  devIndicators: false,
 };
 
 export default nextConfig;

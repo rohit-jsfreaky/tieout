@@ -1,4 +1,4 @@
-"""Eight routes over the exception loop. No logic lives here.
+"""Nine routes over the exception loop. No logic lives here.
 
     GET  /queue                        the exceptions, with where each one got to
     GET  /exceptions/{id}              the evidence pack and the proposed decision
@@ -8,6 +8,7 @@
     GET  /policies                     every rule, every version, and what it has cleared
     GET  /metrics                      human touches, auto-clears, evidence, citations
     POST /reset                        the world and Tieout's memory back to the seed
+    GET  /screenshots/{name}           the PNG a portal Fact points at, as bytes
 
 Each handler does the same three things: ask the engine, read the store, return the pydantic
 object. If a line in this file ever compares a number to a threshold, cites a rule or opens a
@@ -20,15 +21,18 @@ import asyncio
 import json
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from sse_starlette.sse import EventSourceResponse, ServerSentEvent
 
 from ..engine import investigate, load_env, metrics, policy, store
 from ..engine.events import Event
 from ..engine.models import Decision, DecisionAction, ExceptionCase, Metrics, Policy
+from ..engine.sources.portal import screenshot_dir
 from . import runner
 from .schemas import (
     DecideRequest,
@@ -243,6 +247,22 @@ def policies() -> PoliciesResponse:
 def counters() -> Metrics:
     """Counted from the store on every request. Nothing here is typed in."""
     return metrics.compute()
+
+
+@app.get("/screenshots/{name}", response_class=FileResponse)
+def screenshot(name: str) -> FileResponse:
+    """The PNG a portal ``Fact`` points at, so the desk can show what the browser saw.
+
+    ``Fact.screenshot`` is an absolute path on the machine the engine ran on, which a browser
+    cannot open. This hands back the same bytes over HTTP and nothing else: the name is
+    reduced to its last component and has to land directly inside the screenshot folder, so
+    no path a client sends can reach anything the engine did not write there.
+    """
+    root = screenshot_dir().resolve()
+    path = (root / Path(name.replace("\\", "/")).name).resolve()
+    if path.parent != root or not path.is_file():
+        raise HTTPException(status_code=404, detail=f"no screenshot {name}")
+    return FileResponse(path, media_type="image/png")
 
 
 @app.post("/reset", response_model=ResetResponse)

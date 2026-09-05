@@ -5,6 +5,30 @@
 
 ## Current state — 2026-09-06
 
+- **Phase 4 (desk) is DONE. All four phases are done.** Its finish line passes: **the four
+  beats can be driven from the screen with nothing else open** — no terminal, no curl, no
+  mock data. `npm run typecheck`, `npm run lint` and `npm run build` are clean.
+  Detail in `desk/PROGRESS.md`.
+  - Work E1 → the facts land live, each with its source chip, its link, the time and whether
+    code or the model read it; the portal fact carries its screenshot.
+  - Approve as **Chris, Controller** → `SHORT-SHIP-01 v1` appears on the right with his name
+    and the date on it.
+  - Work E2 → its queue row reads **"cleared by SHORT-SHIP-01 v1 · Chris, Controller"** and
+    human touches stays at **1**. That row is the product.
+  - Work E5 → **"Not confident — you decide"**, 0 of 4 checks, and the full list of the eight
+    places it looked.
+  - **A live browser panel** (asked for on top of `desk/PLAN.md`) shows the VendorLink page
+    the agent is reading, as each portal screenshot arrives on the stream — so the sign-in
+    happens inside the product instead of in a second window.
+  - Counters from a real run: **5 exceptions · 1 human touch · 1 auto-cleared · 1 refused ·
+    12 evidence items · 3 screenshots.** The evidence count moves run to run (10–16) because
+    how many facts the model pulls out of the vendor's email is not deterministic; every
+    reproducible number — the rule, the citation, the touches — is identical every time.
+- **The API has a ninth route.** `GET /screenshots/{name}` serves the PNGs a portal `Fact`
+  points at, because an absolute path on this machine is not something a browser can open.
+  It holds no logic and it has a test. That was the one open call for Rohit in the note
+  below; it is now closed. `pytest backend/tests` is **46 green**, ruff clean.
+- **Left for Rohit:** the README, the demo video, and the Discord post. No code left.
 - **Phase 3 (api) is DONE.** Its finish line passes: **the four beats run through `curl`
   alone**, against a live `python -m tieout.api` on :8700, with the SSE stream showing the
   VendorLink sign-in as it happens. Eight routes, no logic in `api/`. `pytest backend/tests`
@@ -17,10 +41,6 @@
     sign-in — the saved session was reused. `POST /exceptions/E5/work` streams `refused`.
   - `GET /metrics` returns the same numbers `tieout demo` prints: 5 found, 1 human touch,
     1 auto-cleared, 1 refused, 16 evidence items, 3 screenshots, 1 policy, 1 citation.
-- **Next:** Phase 4 (`desk/`) in AO session S4, step 4b. It is unblocked.
-  One call for Rohit first: the desk wants a screenshot thumbnail, and there is no route
-  that serves `~/.tieout/screenshots/*.png` because `backend/PLAN.md` says eight routes and
-  only eight were built. Adding a ninth is ten minutes — see `backend/PROGRESS.md`.
 
 ## Earlier — 2026-09-05
 
@@ -89,6 +109,12 @@ Open AO. Session S1 on the `world` module. Read `backend/PLAN.md`. Go.
 
 ## Session log
 
+- **2026-09-06 (S4, `desk`)** — Phase 4 finished inside the window: steps 4b, 4c and 4d,
+  plus a live browser panel that was not in the plan. The desk's types were reconciled
+  against the real `engine/models.py` (4a had guessed them from `backend/PLAN.md` and got
+  several wrong). The four beats were driven from the screen end to end three times
+  against a live API and a real Chromium on the real portal. The API gained its ninth
+  route, `GET /screenshots/{name}`, with a test — the only backend change.
 - **2026-09-03** — event researched, idea picked, Discord read, scaffold + plans written.
 - **2026-09-04** — structure simplified to TWO folders: `backend/` (one Python project with
   world/engine/api modules) and `desk/`. Was three separate Python projects; now one

@@ -23,7 +23,7 @@ def _banner(host: str, port: int) -> str:
     base = f"http://{host}:{port}"
     lines = [
         "",
-        "  Tieout is listening. Eight routes, no logic.",
+        "  Tieout is listening. Nine routes, no logic.",
         "",
         f"    GET  {base}/queue",
         f"    GET  {base}/exceptions/E1",
@@ -33,6 +33,7 @@ def _banner(host: str, port: int) -> str:
         f"    GET  {base}/policies",
         f"    GET  {base}/metrics",
         f"    POST {base}/reset",
+        f"    GET  {base}/screenshots/E1-PO-1042.png",
         "",
         f"  Docs: {base}/docs",
         "",

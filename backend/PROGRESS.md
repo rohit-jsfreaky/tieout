@@ -8,7 +8,7 @@
 - The Phase 3 finish line passes: **the four beats run through `curl` alone**, with the SSE
   stream showing the VendorLink sign-in live. Verified against a real `python -m tieout.api`
   on :8700 with a real Chromium — not only in tests.
-- `pytest backend/tests -q` is green — **45 tests in ~61 s**, including six that drive a real
+- `pytest backend/tests -q` is green — **46 tests in ~60 s**, including six that drive a real
   Chromium against the real portal. `ruff check` and `ruff format` clean.
 - The Phase 2 finish line still passes: `tieout demo` runs all four beats from a fresh reset,
   and the model (`glm-4-7-flash` on TensorMux) really does write the fact extractions and the
@@ -18,7 +18,7 @@
 
 ### Phase 3 — `api/` (steps 3a–3c)
 
-**Eight routes, and not one line of product logic.** `main.py` only asks the engine, reads
+**Nine routes, and not one line of product logic.** `main.py` only asks the engine, reads
 the store and returns the pydantic object.
 
 ```
@@ -30,6 +30,7 @@ POST /exceptions/{id}/decide   {action, by, note?} -> the decision AND the rule 
 GET  /policies                 every rule, every version, with cited_by
 GET  /metrics                  the counters, computed from the store on every request
 POST /reset                    world + store + saved session + screenshots back to zero
+GET  /screenshots/{name}       the PNG a portal Fact points at (added for the desk, 4b)
 ```
 
 - **`runner.py`** starts `engine.investigate.work` on a worker thread and fans the engine's
@@ -91,10 +92,10 @@ POST /reset                    world + store + saved session + screenshots back 
 - `world/__main__.py` gained `start_background()` so `tieout demo` can run the company
   in-process for the length of the demo. `serve()` now uses it.
 
-### Tests (45 green)
+### Tests (46 green)
 
 `test_seed.py` (18, Phase 1) · `test_match.py` (5) · `test_evidence.py` (8) ·
-`test_policy_loop.py` (3) · `test_refuse.py` (4) · `test_api.py` (7, Phase 3).
+`test_policy_loop.py` (3) · `test_refuse.py` (4) · `test_api.py` (8, Phase 3).
 
 - `test_api.py` drives the real app over real HTTP against the real test world, subscribing
   to the stream **before** starting the work, exactly as the desk will. It asserts the
@@ -162,16 +163,16 @@ curl :8700/policies ; curl :8700/metrics
 
 ## Next action
 
-Phase 4 (`desk/`) in AO session S4. `lib/api-types.ts` should mirror `engine/models.py` and
-`engine/events.py` — the API adds no shapes of its own except `done` on the stream. Read
-`api/main.py`'s module docstring first; it is eight lines and it is the whole contract.
+Nothing here. Phase 4 (`desk/`) is done too — see `desk/PROGRESS.md`.
 
-**One thing Phase 4 will need that Phase 3 deliberately did not build:** the desk cannot
-show a screenshot thumbnail, because a `Fact.screenshot` is an absolute path on this machine
-(`~/.tieout/screenshots/E1-PO-1042.png`) and there is no route that serves it. `PLAN.md`
-says "only the eight routes", so S3 did not add a ninth. Serving them is either a
-`StaticFiles` mount on `screenshot_dir()` or a `GET /screenshots/{name}` — a ten-minute job,
-but it is Rohit's call whether to widen the route list.
+**The ninth route exists now (added 2026-09-06 by S4).** Phase 3 deliberately stopped at
+eight, which left the desk unable to show a screenshot: a `Fact.screenshot` is an absolute
+path on this machine (`~/.tieout/screenshots/E1-PO-1042.png`) and a browser cannot open one.
+`GET /screenshots/{name}` is a `FileResponse` over `engine.sources.portal.screenshot_dir()`
+and holds no logic: the name is reduced to its last component and must resolve directly
+inside that folder, so nothing else on disk is reachable.
+`test_the_screenshot_a_fact_points_at_is_served_as_bytes` covers the happy path and four
+escape attempts. It is what the desk's live browser panel draws.
 
 ## Decisions made (Phase 2)
 
@@ -234,8 +235,8 @@ that feeds it 2024 and expects a rejection).
 
 ## Blockers
 
-- None. One open call for Rohit: whether the desk may have a ninth route to serve the
-  portal screenshots (see "Next action").
+- None. The ninth route (`GET /screenshots/{name}`) was added on 2026-09-06 — see
+  "Next action".
 - Note for anyone working in an AO worktree: `pip install -e backend[dev]` is bound to
   whichever worktree ran it, so `pytest` can silently test another session's code. Run
   `PYTHONPATH=<this worktree>/backend/src python -m pytest backend/tests -q` to be sure.

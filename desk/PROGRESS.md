@@ -2,71 +2,133 @@
 
 > Working memory for this folder. Read first, update before ending every session.
 
-## Current state — 2026-09-05
+## Current state — 2026-09-06
 
-- **4a DONE.** Next.js skeleton + design system on screen. `npm run dev` renders the styled
-  empty four-zone layout; `npm run typecheck`, `npm run lint` and `npm run build` are clean.
-- 4b/4c/4d not started. Still correctly blocked on the API (Phase 3) for any real data.
+- **4a, 4b, 4c and 4d are DONE.** The four beats can be driven from the screen with no
+  terminal open, against a live `python -m tieout.api` on :8700. `npm run typecheck`,
+  `npm run lint` and `npm run build` are clean.
+- **No mock mode anywhere.** Every figure on the screen came out of `GET /metrics` or off the
+  SSE stream in that session. `lib/api.ts` is still the only file that fetches.
+- Verified by driving the real screen end to end (a throwaway Playwright script, since deleted)
+  against a real run: the four beats passed and the header read
+  **5 exceptions · 1 human touch · 1 auto-cleared · 1 refused · 12 evidence items ·
+  3 screenshots**.
 
 ## Done
 
-- **4a — skeleton + design system.**
-  - create-next-app (TS strict, Tailwind v4, App Router, no `src/`, ESLint). All boilerplate
-    stripped: default page, favicon, `public/*.svg`, generated README/AGENTS. `next` came out
-    at **16.3.4**, which is the published `latest` — no hand-fix needed this time.
-  - `app/globals.css` is the whole design system, ported from Cairn's: `@theme` with three
-    inks + two grounds + ONE accent, the 4px-stepped radius scale (`--radius-xs` 6px →
-    `--radius-3xl` 40px), `corner-shape: squircle` globally with `.rounded-full` opting back
-    out, and the four inset-shadow depth utilities (`surface`, `surface-raised`,
-    `surface-floating`, `well`) plus `hairline`, copied verbatim.
-  - Fonts are Tieout's own, not Cairn's: **Fraunces Variable** (display),
-    **Geist Variable** (body), **Geist Mono Variable** (figures), self-hosted via
-    `@fontsource-variable/*`.
-  - `font-variant-numeric: tabular-nums` on `body`, so every figure on the screen aligns
-    without anyone remembering to ask.
-  - Layout: counters strip on top, QUEUE / EVIDENCE PACK / POLICIES side by side with
-    hairline dividers, controls along the bottom. Styled, no data.
-  - `lib/api-types.ts` + `lib/api.ts` — typed stubs for the seven Phase 3 routes plus the SSE
-    URL. `api.ts` throws until 4b puts a fetch behind `request`; nothing fetches yet.
+### 4b — queue + evidence pack
+
+- `lib/api-types.ts` **rewritten against the real backend.** The 4a version was a guess from
+  `backend/PLAN.md`; every shape is now mirrored from `engine/models.py` and `engine/events.py`
+  in the same order, because `api/schemas.py` re-exports them unchanged. Pydantic
+  `computed_field`s (`exposure`, `short_pct`, `Policy.ref`, …) are on the wire, so the desk
+  never recomputes a number the engine published. The 4a guesses are gone: there is no
+  `exception_class` (it is `kind`), no `Refusal` object (a refusal is a `Decision` with
+  `action: "refuse"`), and the queue is `{count, exceptions: QueueRow[]}`, not a bare array.
+- `lib/api.ts` — nine routes and one stream. `ApiError` carries FastAPI's own `detail`, so a
+  409 reads "an investigation is already running on E1" rather than "Failed to fetch".
+  `streamException` subscribes to all twelve `EventKind`s plus `done`, because sse-starlette
+  names each message by the event's own `kind` — **there is no `message` listener to hang
+  anything on**, which is the one thing that will silently break if someone adds a kind.
+- `lib/useDesk.ts` — the whole state. Live events are merged into the fetched pack by id
+  (facts) and by `source|action|locator|at` (steps), so the same list works mid-run and at
+  rest with no second code path.
+- Queue rows: class, status, billed amount, exposure, fact count, live "working" spinner.
+- Evidence pack: one `FactCard` per fact with its source chip, its clickable locator, the
+  time, **whether code or the model read it**, and the portal screenshot as a thumbnail.
+- Proposed decision with the confidence bar and the written checklist under it; the refusal
+  gets its own card with the full "here is where I looked" list, every dead end included.
+
+### 4c — decide + policies + counters
+
+- `DecideBar`: Approve / Reject / Edit. Approve means "do what Tieout proposed" and the engine
+  resolves it; Edit opens a picker for the other three `DecidableAction`s plus the note that
+  ends up on the rule. The approver's name comes from the control bar and is shown next to
+  the buttons, so nobody presses Approve without seeing whose name goes on the policy.
+- `PolicyCard`: id, version, active/superseded, the condition, the action, **the approver and
+  the date**, what it was learned from, and what has cited it. The condition is rendered from
+  the `PolicyCondition` fields in the order `describe()` writes them — that method is a plain
+  Python method and is not on the wire.
+- Counters are six real figures from `GET /metrics`, refetched whenever a run or a decision
+  finishes. Empty still reads "—", never `0`.
+- **The moment works.** After one approval, working E2 turns its queue row into
+  **"cleared by SHORT-SHIP-01 v1 · Chris, Controller"** and human touches stays at 1.
+
+### 4d — polish
+
+- Loading, empty and error states everywhere; `ErrorBanner` shows the API's own words.
+- Reset button (`POST /reset`) puts the world, the memory, the saved session and the
+  screenshots back and reselects E1.
+- `animate-land` — one short arrival for a fact, an auto-clear row and a newborn rule, with a
+  `prefers-reduced-motion` escape.
+- The pack reads as one document and follows itself: the newest fact while evidence lands,
+  then the verdict from its first line the moment there is one.
+- `devIndicators: false` — Next's dev badge sat exactly on the approver field, and this screen
+  gets recorded from `next dev`.
+
+### The live browser panel (asked for on top of the plan)
+
+A fourth zone. The engine's Playwright session is a real Chromium on the same machine, and
+before this it was invisible unless you ran `HEADLESS=0` and filmed a second window. The panel
+draws a browser chrome, puts the fact's own locator in the address bar, and shows the
+screenshot the agent filed as evidence — updating as each portal fact arrives on the stream.
+Clicking a fact card's thumbnail pins that one.
+
+**One route was added to the API to make this possible**, which is the ninth route on a plan
+that said eight. `Fact.screenshot` is an absolute path on the engine's machine
+(`C:\Users\…\.tieout\screenshots\E1-PO-1042.png`), and a browser cannot open one.
+`GET /screenshots/{name}` serves those bytes and nothing else: the name is reduced to its last
+component and must resolve directly inside the screenshot folder. No logic went into `api/`;
+it is a `FileResponse` over `engine.sources.portal.screenshot_dir()`, and
+`backend/tests/test_api.py` covers both the happy path and four escape attempts.
 
 ## Next action
 
-4b from PLAN.md — queue + evidence pack, once the API's Phase 3 finish line passes.
+Nothing in this folder. Phase 4 is done. What is left is Rohit's: the README, the video and
+the Discord post.
 
 ## Decisions made
 
-- One page. The "cleared by SHORT-SHIP-01 · Chris, Controller" row is the product moment.
-- Fraunces + Geist + Geist Mono + inset shadows + squircles (Rohit's locked taste; Cairn's
-  Shantell/Hanken pair stays Cairn's).
-- **Accent: ledger blue `#14508c`** (`--color-ledger`). Cairn's moss is taken. Used for
-  eyebrows, ticks and the winning number only — nowhere else.
-- Numbers live in Geist Mono, headings in Fraunces at weight 450–500, never bold.
-- Empty counters read **"—"**, never `0`. A figure on this screen only ever comes from a real
-  run (root rule 6).
-- No chart library — counters and a confidence bar drawn as a `well` track.
-- **@phosphor-icons/react not installed yet.** 4a has nothing for an icon to do and the folder
-  rule is "no unused deps". Add it in 4b, where source chips and status badges need it.
-- API base comes from `NEXT_PUBLIC_API_BASE`, defaulting to `http://localhost:8700`.
+- One page, as planned, but **four zones instead of three**: the live browser sits above the
+  policies in the right column. The three-column diagram in `CLAUDE.md` predates the browser
+  panel being asked for.
+- **Approve/Reject/Edit is three buttons, not a form.** The one human touch should cost one
+  click; Edit is the escape hatch and hides until it is wanted.
+- **The live event trail disappears when the run ends.** While it is happening it is the whole
+  point ("signed in to VendorLink as ap-bot@kestrelmfg.com"); afterwards every line of it is
+  in the facts and the checklist, and the pack is what a person reads.
+- **The rationale is never truncated.** It is the audit trail; a `line-clamp` on it would have
+  bought two visible fact cards and cost the thing the project is about.
+- `Screenshot.tsx` is the only `<img>` on the desk and the only eslint-disable. `next/image`
+  optimises and caches remote files, and both are wrong for a live artefact of the run
+  happening on screen.
+- Phosphor is installed now that there is something for an icon to do (source chips, ticks,
+  the browser chrome, the rule stamp). Still no chart library and no state library.
+- Times are wall-clock (`en-GB`, 24h) because the reader is watching it happen; dates are
+  `6 Sept 2026` because that is what goes on a rule.
 
-## Notes for 4b
+## How to run it
 
-- `lib/api-types.ts` was written from `backend/PLAN.md` Phase 3, before `api/schemas.py`
-  exists. **Reconcile the two the moment 3a lands.** One known guess: `class` is a Python
-  keyword, so the exception's class is typed as `exception_class` here.
-- Next 16 appended its own `nextjs-agent-rules` block to `desk/CLAUDE.md` on first `next dev`.
-  It is regenerated on every dev run — commit it, do not delete it.
-- The container rhythm is Cairn's `max-w-[1280px]` + `px-6` + `border-black/6` hairlines, but
-  the vertical rhythm is NOT Cairn's `py-24/py-32`. This is a full-height desk, not a landing
-  page: the header is `py-6`, the footer `py-4`, and the three zones scroll inside `h-dvh`.
+```bash
+python -m tieout.api            # :8700 — starts the fake company too
+cd desk && npm run dev          # :3000 (or the next free port — check the log)
+```
+
+Then, on the screen and nowhere else: **Work E1 → Approve → select E2 → Work E2 → select E5 →
+Work E5.** `NEXT_PUBLIC_API_BASE` moves the API off `http://localhost:8700`.
 
 ## Blockers
 
-- Phase 3 not done. 4b cannot start until `curl :8700/queue` works.
+None.
 
 ## Session log
 
 - **2026-09-03** — folder created, plan written. No code.
 - **2026-09-05** — 4a built: Next 16.3.4 skeleton, design system ported from Cairn with new
   fonts and a new accent, empty four-zone layout, typed API stubs. Verified with a real
-  `next dev` (page 200, fonts and compiled utilities served), `tsc --noEmit`, `eslint`,
-  `next build` — all clean.
+  `next dev`, `tsc --noEmit`, `eslint`, `next build` — all clean.
+- **2026-09-06** — 4b, 4c and 4d built, plus the live browser panel. The types were
+  reconciled against the real `engine/models.py`. The four beats were driven from the screen
+  three times end to end against a live API and a real Chromium on the real portal, with
+  screenshots checked each time; the counters on screen are the ones `GET /metrics` returns.
+  Added `GET /screenshots/{name}` to the API — the only backend change — with a test.

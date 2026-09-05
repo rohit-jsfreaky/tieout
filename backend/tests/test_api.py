@@ -27,6 +27,9 @@ SUBSCRIBE_GRACE_SECONDS = 1.0
 # Every field on engine.events.Event. If the API ever reshapes one, the desk breaks silently.
 EVENT_FIELDS = {"kind", "message", "at", "exception_id", "fact", "step", "decision", "policy"}
 
+# The first eight bytes of every PNG. Enough to prove the route served a file, not JSON.
+PNG_HEADER = b"\x89PNG\r\n\x1a\n"
+
 
 @pytest.fixture
 def client(world_urls: dict[str, str], monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
@@ -244,3 +247,21 @@ def test_reset_puts_the_world_and_the_memory_back(client: TestClient) -> None:
     assert counters["evidence_items"] == 0
     assert counters["policies_active"] == 0
     assert client.get("/queue").json()["count"] == 5
+
+
+def test_the_screenshot_a_fact_points_at_is_served_as_bytes(client: TestClient) -> None:
+    """The desk cannot open an absolute path, so the API hands the same PNG back over HTTP."""
+    from tieout.engine.sources.portal import screenshot_dir
+
+    folder = screenshot_dir()
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / "E1-PO-1042.png").write_bytes(PNG_HEADER)
+
+    served = client.get("/screenshots/E1-PO-1042.png")
+    assert served.status_code == 200
+    assert served.headers["content-type"] == "image/png"
+    assert served.content == PNG_HEADER
+
+    # Nothing outside the screenshot folder is reachable, whichever separator is tried.
+    for escape in ("../engine.db", "..%2Fengine.db", r"..\engine.db", "nope.png"):
+        assert client.get(f"/screenshots/{escape}").status_code == 404
