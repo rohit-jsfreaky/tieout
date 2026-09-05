@@ -135,6 +135,40 @@ MODEL_ID       = gemma-4-31b
 - Live test returned HTTP 200 and the right answer, using 113 total tokens:
   prompt "we shipped 95 of the 100 units on Sep 2" -> `{"shipped": 95, "ordered": 100}`.
 
+### ⚠️ THE MODEL CHANGED MID-BUILD — `glm-4-7-flash` is now the ONLY one (2026-09-05 23:30)
+
+`gemma-4-31b` was **removed by TensorMux during the build window**. It now returns
+`model_not_found` (HTTP 400) and `GET /v1/models` lists exactly one model: `glm-4-7-flash`.
+Found because Rohit noticed their console only showed glm and asked us to check instead of
+trusting the note we had written two hours earlier. Lesson: re-verify a provider's model list
+before depending on it, not once at setup.
+
+`MODEL_ID` and a new `MODEL_MAX_TOKENS=800` are set in `.env`. Verified working after the
+switch: correct answer, correct year, `finish_reason: stop`, 337 completion tokens.
+
+### `glm-4-7-flash` is a REASONING model — this is now mandatory, not optional
+
+Offered by TensorMux in the Discord. Tested on the same fact-extraction prompt. It works, but
+it is a **reasoning model** and that changes how it must be called:
+
+- It writes its thinking into a separate **`reasoning`** field and leaves **`content` EMPTY**
+  until the thinking finishes. At `max_tokens=150` it returned `content: None`, HTTP 200, no
+  error, 150 completion tokens burned. **A silent empty answer is the worst failure mode we
+  could have** — the engine would record a Fact with nothing in it.
+- At `max_tokens=800` it answered correctly, and got the year right (2026-09-02) once the
+  prompt carried today's date.
+- Cost: **299 completion tokens** for the job gemma does in **39**. Roughly 7x. With a
+  20,000 tokens/minute rate limit that matters.
+- It still wraps JSON in a ``` fence, same as gemma.
+
+**Decision (forced): `glm-4-7-flash`, `max_tokens` 800.** gemma no longer exists, so the
+reasoning-model handling is REQUIRED, not a nice-to-have:
+- `max_tokens` >= 600 on every call, from `MODEL_MAX_TOKENS` in `.env`
+- an empty `content` MUST raise, never be recorded as an empty answer
+- budget ~340 completion tokens per call; with a 20,000 tokens/minute limit that is roughly
+  55 calls per minute of headroom, and investigations run one at a time, so it is fine
+- the `reasoning` field is useful for debugging but must never be stored as a Fact
+
 ### TWO GOTCHAS found in that very first call — both would corrupt evidence silently
 
 1. **It wraps JSON in a markdown code fence.** The reply was ```` ```json
