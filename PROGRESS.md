@@ -3,9 +3,12 @@
 > Read this first, every session. Update it before ending the session.
 > Per-folder detail: `backend/PROGRESS.md`, `desk/PROGRESS.md`.
 
-## Current state — 2026-09-03
+## Current state — 2026-09-05
 
-- **Current phase:** 0 (Setup). Build window opens **Sep 5, 21:30 IST**.
+- **Build window is open.** Phase **4a is done** (see `desk/PROGRESS.md`); Phases 1–3
+  (`backend/`) are in flight in their own AO sessions. The desk cannot go past 4a until the
+  Phase 3 finish line passes.
+- Setup notes below are kept for the record.
 - Registered on Luma, approved, Discord joined (2026-09-03).
 - Idea locked via the hackathon_ideas pipeline (that repo's `IDEAS-LOG.md`, entry 2026-09-03).
   Discord read: nobody has announced an idea; judge is a 22-time winner; his stated priority
@@ -48,6 +51,11 @@ Open AO. Session S1 on the `world` module. Read `backend/PLAN.md`. Go.
   pyproject, one venv, one install. Phases and finish lines unchanged.
   AO v0.12.10 confirmed (Windows .exe, 126 MB). TensorMux (sponsor) gives $5 free with no
   card and is OpenAI-compatible — use it as the model provider, OpenRouter $3 as backup.
+- **2026-09-05** — S4 / Phase **4a done** (desk skeleton + design system). Next 16.3.4,
+  Tailwind v4, Cairn's inset-shadow/squircle system ported with Tieout's own fonts (Fraunces
+  + Geist + Geist Mono) and its own accent (ledger blue `#14508c`). Empty four-zone layout
+  renders, typecheck/lint/build clean. Detail in `desk/PROGRESS.md`. 4b still blocked on
+  Phase 3.
 - **2026-09-04 (later)** — TensorMux signed up with Google, API key created and stored in
   `.env` (gitignored, Rohit rotates after). $5/$5 credit verified, expires Sep 18. Only one
   model live: `gemma-4-31b`. Rate limits 15 rpm / 20k tpm. First real call passed and exposed

@@ -10,8 +10,9 @@ Phase 4. Read `PLAN.md`, then `PROGRESS.md`. Root rules in `../CLAUDE.md` apply.
 ## Stack
 
 Next.js 16 (App Router) · TypeScript strict · Tailwind v4 · fonts via @fontsource:
-**Shantell Sans** (display) + **Hanken Grotesk** (body) · icons **@phosphor-icons/react** ·
-no chart library, no state library.
+**Fraunces** (display, a ledger serif) + **Geist** (body) + **Geist Mono** (every figure) ·
+icons **@phosphor-icons/react** · no chart library, no state library.
+(Cairn's Shantell Sans + Hanken Grotesk are Cairn's; Tieout does not reuse them.)
 
 ⚠️ **Next 16 differs from training data.** After the first `next dev`, a block appears in this
 file pointing at `node_modules/next/dist/docs/`. Read it before writing app code. Check the
@@ -22,7 +23,8 @@ unpublished one and had to be set to 16.3.3 by hand.
 
 - NO Inter, NO generic SaaS fonts. NO Lucide, NO Material icons.
 - Depth via layered INSET shadows, not drop shadows. Squircle corners where supported.
-- One accent colour only. Headings in Shantell Sans at 450–500 weight, never bold.
+- One accent colour only — ledger blue `#14508c`, for eyebrows, ticks and the winning number.
+- Headings in Fraunces at 450–500 weight, never bold. Figures are tabular, always.
 - Opinionated and finished beats neutral and safe. A finance desk can still have taste.
 
 ## The one architecture rule
@@ -61,3 +63,13 @@ boilerplate. No unused deps.
 
 Renders correctly during a REAL run against the API (no mock mode) + typecheck clean +
 PROGRESS.md updated.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->
