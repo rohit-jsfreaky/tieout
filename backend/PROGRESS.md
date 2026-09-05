@@ -2,17 +2,49 @@
 
 > Working memory for this folder. Read first, update before ending every session.
 
-## Current state — 2026-09-05 (AO session S2, `engine` module)
+## Current state — 2026-09-06 (AO session S3, `api` module)
 
-- **Phase 1 (world) is DONE.** **Phase 2 (engine) is DONE.** Phase 3 (api) not started.
-- The Phase 2 finish line passes: `tieout demo` runs all four beats from a fresh reset, and
-  `pytest backend/tests -q` is green — **38 tests in ~41 s**, including three that drive a
-  real Chromium against the real portal. `ruff check` and `ruff format` clean.
-- Verified live, not only in tests: the four beats also run as separate CLI commands against
-  a separately running `tieout world`, and the model (`glm-4-7-flash` on TensorMux) really
-  does write the fact extractions and the rationale.
+- **Phase 1 (world), Phase 2 (engine) and Phase 3 (api) are all DONE.**
+- The Phase 3 finish line passes: **the four beats run through `curl` alone**, with the SSE
+  stream showing the VendorLink sign-in live. Verified against a real `python -m tieout.api`
+  on :8700 with a real Chromium — not only in tests.
+- `pytest backend/tests -q` is green — **45 tests in ~61 s**, including six that drive a real
+  Chromium against the real portal. `ruff check` and `ruff format` clean.
+- The Phase 2 finish line still passes: `tieout demo` runs all four beats from a fresh reset,
+  and the model (`glm-4-7-flash` on TensorMux) really does write the fact extractions and the
+  rationale.
 
 ## Done
+
+### Phase 3 — `api/` (steps 3a–3c)
+
+**Eight routes, and not one line of product logic.** `main.py` only asks the engine, reads
+the store and returns the pydantic object.
+
+```
+GET  /queue                    three-way match, then the five exceptions + where each got to
+GET  /exceptions/{id}          the evidence pack, the decision, and the rule it cited
+POST /exceptions/{id}/work     202; runs on a thread. ?portal=false skips the browser
+GET  /exceptions/{id}/events   SSE: the engine's own Event objects, verbatim
+POST /exceptions/{id}/decide   {action, by, note?} -> the decision AND the rule it learned
+GET  /policies                 every rule, every version, with cited_by
+GET  /metrics                  the counters, computed from the store on every request
+POST /reset                    world + store + saved session + screenshots back to zero
+```
+
+- **`runner.py`** starts `engine.investigate.work` on a worker thread and fans the engine's
+  `Event` objects out to every open stream **unchanged**. It buffers them too, so
+  `POST /work` followed by `GET /events` cannot lose the first few — the replay and the
+  subscription are taken under one lock, so a stream never misses an event or sees one twice.
+- **The stream also carries the decide beat.** `POST /decide` passes the same sink, so
+  `decided` and `policy_learned` land on that exception's stream as well.
+- **One investigation at a time** (409 otherwise): the browser, the saved VendorLink session
+  and the screenshot folder are a single shared resource. `POST /reset` during a run is also
+  a 409 rather than a silent loss.
+- **The API starts the world itself** if the ERP is not answering, and stops only what it
+  started — so `python -m tieout.api` plus `curl` is the whole demo.
+- The only shape on the wire the engine did not write is the stream's own `done` message
+  (`{exception_id, state, error}`), which is transport, not evidence.
 
 ### Phase 2 — `engine/` (steps 2a–2e)
 
@@ -59,10 +91,17 @@
 - `world/__main__.py` gained `start_background()` so `tieout demo` can run the company
   in-process for the length of the demo. `serve()` now uses it.
 
-### Tests (38 green)
+### Tests (45 green)
 
 `test_seed.py` (18, Phase 1) · `test_match.py` (5) · `test_evidence.py` (8) ·
-`test_policy_loop.py` (3) · `test_refuse.py` (4).
+`test_policy_loop.py` (3) · `test_refuse.py` (4) · `test_api.py` (7, Phase 3).
+
+- `test_api.py` drives the real app over real HTTP against the real test world, subscribing
+  to the stream **before** starting the work, exactly as the desk will. It asserts the
+  VendorLink sign-in step arrives live, that every SSE message has precisely the fields of
+  `engine.events.Event` (so a reshape here breaks a test rather than the desk), that one
+  approval makes E2 auto-clear citing the rule and Chris, that E5 refuses, and that a second
+  `/work` while one is running is a 409.
 
 - `test_match.py::test_the_engine_cannot_read_the_seed` scans every engine file for
   `SEED_EXCEPTIONS` or an import of the world. The architectural promise is enforced, not
@@ -78,6 +117,9 @@
 5 exceptions found · 3 worked · **1 human touch** · 1 auto-cleared citing `SHORT-SHIP-01 v1`
 approved by Chris, Controller · 1 refused · 16 evidence items · 3 screenshots · 1 active
 policy · 1 citation. Working all five gives 5 worked / 28 evidence items.
+
+`GET /metrics` after the same four beats over curl (2026-09-06) returns exactly those
+numbers — the API counts nothing of its own.
 
 ## How to run it
 
@@ -95,12 +137,41 @@ pytest backend/tests -q
 HEADLESS=0 tieout demo             # a real browser window, for the video
 ```
 
+### The four beats over curl (the Phase 3 finish line)
+
+```bash
+python -m tieout.api               # :8700, and starts the company if it is not running
+curl -X POST :8700/reset
+curl :8700/queue                                     # the five exceptions
+
+curl -N :8700/exceptions/E1/events &                 # beat 1: watch it happen
+curl -X POST :8700/exceptions/E1/work                #   ... the VendorLink sign-in is live
+
+curl -X POST :8700/exceptions/E1/decide \            # beat 2: the rule is born
+  -H 'Content-Type: application/json' \
+  -d '{"action":"approve","by":"Chris, Controller"}'
+
+curl -N :8700/exceptions/E2/events &                 # beat 3: auto_cleared,
+curl -X POST :8700/exceptions/E2/work                #   citing SHORT-SHIP-01 v1 and Chris
+
+curl -N :8700/exceptions/E5/events &                 # beat 4: refused
+curl -X POST :8700/exceptions/E5/work
+
+curl :8700/policies ; curl :8700/metrics
+```
+
 ## Next action
 
-Phase 3, step 3a in `PLAN.md` (`api/` — thin FastAPI over `engine.investigate.work`, plus
-SSE), in AO session S3. `investigate.work()` and the `EventSink` are already the seam the
-API needs: `runner.py` runs `work` on a thread and fans `Event` objects out over SSE. Do not
-put a rule, a threshold, a Playwright call or a model call in `api/`.
+Phase 4 (`desk/`) in AO session S4. `lib/api-types.ts` should mirror `engine/models.py` and
+`engine/events.py` — the API adds no shapes of its own except `done` on the stream. Read
+`api/main.py`'s module docstring first; it is eight lines and it is the whole contract.
+
+**One thing Phase 4 will need that Phase 3 deliberately did not build:** the desk cannot
+show a screenshot thumbnail, because a `Fact.screenshot` is an absolute path on this machine
+(`~/.tieout/screenshots/E1-PO-1042.png`) and there is no route that serves it. `PLAN.md`
+says "only the eight routes", so S3 did not add a ninth. Serving them is either a
+`StaticFiles` mount on `screenshot_dir()` or a `GET /screenshots/{name}` — a ten-minute job,
+but it is Rohit's call whether to widen the route list.
 
 ## Decisions made (Phase 2)
 
@@ -121,6 +192,24 @@ put a rule, a threshold, a Playwright call or a model call in `api/`.
 - **The portal source does not sign out** — persisting the session is the point.
 - **`tieout reset` wipes the world, the engine store, the saved session and the screenshots**,
   so every demo starts genuinely cold.
+
+## Decisions made (Phase 3)
+
+- **The stream carries `engine.events.Event` verbatim.** No envelope, no renaming, no derived
+  fields. The SSE event name is the event's own `kind`, and a test asserts the field set, so
+  the desk can type straight against the engine's model.
+- **The API adds exactly one shape of its own: `done`.** SSE has no other way to say "this
+  run is over", and it carries transport state (`state`, `error`), never evidence.
+- **Events are buffered per exception, so a late subscriber loses nothing.** The desk can
+  `POST /work` and then subscribe, or subscribe first — both give the same complete stream.
+  Replay and subscription happen under one lock.
+- **One investigation at a time, enforced with a 409.** A second browser against the same
+  saved session and the same screenshot folder is a race, not a feature.
+- **The API starts the world if nobody else has, and stops only what it started.** Otherwise
+  the "four beats over curl" claim quietly depends on a second terminal.
+- **`?portal=false` on `/work`** mirrors the CLI's `--no-portal`, so the API is testable
+  without Chromium. It is a transport knob, not a rule.
+- **No `/health` route.** `PLAN.md` lists eight; eight is what exists.
 
 ## Model notes — new, and NOT yet in RESEARCH.md
 
@@ -145,7 +234,11 @@ that feeds it 2024 and expects a rejection).
 
 ## Blockers
 
-- None.
+- None. One open call for Rohit: whether the desk may have a ninth route to serve the
+  portal screenshots (see "Next action").
+- Note for anyone working in an AO worktree: `pip install -e backend[dev]` is bound to
+  whichever worktree ran it, so `pytest` can silently test another session's code. Run
+  `PYTHONPATH=<this worktree>/backend/src python -m pytest backend/tests -q` to be sure.
 
 ## Session log
 
@@ -157,3 +250,9 @@ that feeds it 2024 and expects a rejection).
   decide, the policy loop, metrics, the CLI and `tieout demo`. 38 tests green, ruff clean.
   The four beats verified twice end to end, once via `tieout demo` and once as separate CLI
   commands against a running world.
+- **2026-09-06 (S3, `api`)** — Phase 3 built and finished: eight routes, the background
+  runner and the SSE fan-out, plus `python -m tieout.api`. 45 tests green, ruff clean. The
+  four beats verified through `curl` alone against a live server: the stream showed the
+  VendorLink sign-in on E1, E2 reused the saved session and auto-cleared citing
+  `SHORT-SHIP-01 v1` and Chris, Controller, and E5 refused listing the eight places it
+  looked. `GET /metrics` returned the same numbers the CLI prints.

@@ -3,7 +3,26 @@
 > Read this first, every session. Update it before ending the session.
 > Per-folder detail: `backend/PROGRESS.md`, `desk/PROGRESS.md`.
 
-## Current state — 2026-09-05
+## Current state — 2026-09-06
+
+- **Phase 3 (api) is DONE.** Its finish line passes: **the four beats run through `curl`
+  alone**, against a live `python -m tieout.api` on :8700, with the SSE stream showing the
+  VendorLink sign-in as it happens. Eight routes, no logic in `api/`. `pytest backend/tests`
+  is green — 45 tests — and ruff is clean. Detail in `backend/PROGRESS.md`.
+  - `curl -N :8700/exceptions/E1/events` shows every lookup step and every Fact live,
+    including "signed in to VendorLink as ap-bot@kestrelmfg.com" and the screenshot path.
+  - `POST /exceptions/E1/decide {"action":"approve","by":"Chris, Controller"}` returns the
+    new rule `SHORT-SHIP-01 v1` with the name and date on it.
+  - `POST /exceptions/E2/work` streams `auto_cleared`, citing that rule and Chris, with no
+    sign-in — the saved session was reused. `POST /exceptions/E5/work` streams `refused`.
+  - `GET /metrics` returns the same numbers `tieout demo` prints: 5 found, 1 human touch,
+    1 auto-cleared, 1 refused, 16 evidence items, 3 screenshots, 1 policy, 1 citation.
+- **Next:** Phase 4 (`desk/`) in AO session S4, step 4b. It is unblocked.
+  One call for Rohit first: the desk wants a screenshot thumbnail, and there is no route
+  that serves `~/.tieout/screenshots/*.png` because `backend/PLAN.md` says eight routes and
+  only eight were built. Adding a ninth is ten minutes — see `backend/PROGRESS.md`.
+
+## Earlier — 2026-09-05
 
 - **Phase 1 (world) is DONE.** Its finish line passes: one command starts the ERP (:8701),
   the VendorLink portal (:8702) and the AP inbox (:8703); `curl :8701/invoices` returns 40;
@@ -27,8 +46,6 @@
   makes `glm-4-7-flash` answer in 2.9 s instead of 19.7 s, and empty content is now retried
   with a doubled token budget rather than a longer wait. Both written up in
   `backend/PROGRESS.md` -> "Model notes".
-- **Next:** Phase 3 (`api`) in AO session S3 — a thin FastAPI over `engine.investigate.work`
-  plus the SSE stream. The event sink the API needs already exists.
 
 ## Before the window — 2026-09-03
 
@@ -93,6 +110,10 @@ Open AO. Session S1 on the `world` module. Read `backend/PLAN.md`. Go.
   refusal, the policy loop and `tieout demo`. 38 tests green, ruff clean. The loop works on
   the real world: one approval from Chris, Controller, and the second short-ship cleared
   itself citing `SHORT-SHIP-01 v1` and his name, with no login and no human.
+- **2026-09-06 (S3, `api`)** — Phase 3 built inside the window: eight routes over the engine,
+  a background runner and an SSE stream that forwards the engine's own events unchanged, plus
+  `python -m tieout.api`. 45 tests green, ruff clean. The four beats were driven end to end
+  with nothing but `curl`, and the counters the API returns are the ones the CLI prints.
 - **2026-09-05 (S1, `world`)** — Phase 1 built inside the window: seed + ERP + portal + inbox
   + one-command runner + `tieout reset`, 18 tests. The fake company is Kestrel Manufacturing
   Co. buying from 8 suppliers; 40 invoices, 35 clean, 5 broken on purpose. The portal is one
