@@ -3,7 +3,17 @@
 > Read this first, every session. Update it before ending the session.
 > Per-folder detail: `backend/PROGRESS.md`, `desk/PROGRESS.md`.
 
-## Current state — 2026-09-03
+## Current state — 2026-09-05
+
+- **Phase 1 (world) is DONE.** Its finish line passes: one command starts the ERP (:8701),
+  the VendorLink portal (:8702) and the AP inbox (:8703); `curl :8701/invoices` returns 40;
+  a real browser signs into the portal and reads "95" off delivery note DN-1042;
+  `tieout reset` puts the world back to the seed. 18 tests green, ruff clean.
+  Detail in `backend/PROGRESS.md`.
+- **Next:** Phase 2 (`engine`) in AO session S2 — `tieout match` must find exactly the five
+  seeded exceptions and class them, without reading the seed's own exception table.
+
+## Before the window — 2026-09-03
 
 - **Current phase:** 0 (Setup). Build window opens **Sep 5, 21:30 IST**.
 - Registered on Luma, approved, Discord joined (2026-09-03).
@@ -53,3 +63,8 @@ Open AO. Session S1 on the `world` module. Read `backend/PLAN.md`. Go.
   model live: `gemma-4-31b`. Rate limits 15 rpm / 20k tpm. First real call passed and exposed
   two gotchas now written into RESEARCH.md: the model fences its JSON, and it guessed the
   wrong YEAR for a date — both would have poisoned the evidence trail silently.
+- **2026-09-05 (S1, `world`)** — Phase 1 built inside the window: seed + ERP + portal + inbox
+  + one-command runner + `tieout reset`, 18 tests. The fake company is Kestrel Manufacturing
+  Co. buying from 8 suppliers; 40 invoices, 35 clean, 5 broken on purpose. The portal is one
+  supplier network with a real form login and a session cookie, so the engine's Phase 2
+  sign-in is genuine. Verified with curl and with a real Chromium, not only in tests.
