@@ -9,9 +9,11 @@ name: Build and deploy
 #   tieout       the API + the fake company + the browser
 #   tieout-desk  the Next.js screen
 #
-# The dashboard's git deploy works too — both apps are set to build from a
-# Dockerfile (`builder-dockerfile:set <app> dockerfile-path`), so Dokku no longer
-# tries to guess a buildpack from a repo root that has no language marker in it.
+# The dashboard's git deploy works too. The API needs nothing extra — its
+# Dockerfile is at the repo root, which is where Dokku looks when it picks a
+# builder. The desk needs one setting on the server, because its Dockerfile is
+# not at the root:
+#     dokku builder-dockerfile:set tieout-desk dockerfile-path desk/Dockerfile
 # This workflow is the faster path: the API image carries Chromium, and GitHub's
 # runners build it in a fraction of the time the VPS would.
 #
@@ -50,7 +52,8 @@ jobs:
       - name: Build and push the API
         uses: docker/build-push-action@v6
         with:
-          context: ./backend
+          context: .
+          file: ./Dockerfile
           push: true
           tags: |
             ghcr.io/rohit-jsfreaky/tieout-api:latest
@@ -94,7 +97,8 @@ jobs:
       - name: Build and push the desk
         uses: docker/build-push-action@v6
         with:
-          context: ./desk
+          context: .
+          file: ./desk/Dockerfile
           push: true
           build-args: |
             NEXT_PUBLIC_API_BASE=${{ env.API_BASE }}
