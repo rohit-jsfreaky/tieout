@@ -3,6 +3,9 @@
 The one that matters is ``human_touches`` next to ``touches_avoided_by_policy``: one approval
 from a person, and every later exception of that shape costs nobody anything. An approval is
 one touch; an auto-clear is zero.
+
+``worked`` and ``open_not_worked`` always add up to ``exceptions_found``, so the counters
+never quietly lose the exceptions nobody has picked up yet.
 """
 
 from __future__ import annotations
@@ -20,6 +23,7 @@ def compute() -> Metrics:
     return Metrics(
         exceptions_found=len(cases),
         worked=len(packs),
+        open_not_worked=sum(1 for case in cases if case.status is ExceptionStatus.OPEN),
         auto_cleared=sum(1 for decision in decisions if decision.auto),
         refused=sum(1 for case in cases if case.status is ExceptionStatus.REFUSED),
         awaiting_human=sum(

@@ -100,15 +100,24 @@ export function useDesk(): Desk {
 
   /* ------------------------------------------------------------------ reading */
 
+  // Reads of the board are numbered, because two of them can be in the air at
+  // once (one when a run starts, one when it ends). An older answer landing last
+  // would put the previous beat's counters back on screen.
+  const boardSeq = useRef(0);
+
   const loadBoard = useCallback(async () => {
-    const [queued, ruled, counted] = await Promise.all([
-      getQueue(),
-      getPolicies(),
-      getMetrics(),
-    ]);
-    setQueue(queued.exceptions);
-    setPolicies(ruled.policies);
-    setMetrics(counted);
+    const seq = ++boardSeq.current;
+    // The queue read is the one that runs the three-way match and fills the
+    // store; the counters only count what is in there. Asked for in parallel
+    // straight after a reset, /metrics answers from an empty store and the
+    // whole strip reads zero. So: queue first, counters second. Always.
+    const queued = await getQueue();
+    const [ruled, counted] = await Promise.all([getPolicies(), getMetrics()]);
+    if (seq === boardSeq.current) {
+      setQueue(queued.exceptions);
+      setPolicies(ruled.policies);
+      setMetrics(counted);
+    }
     return queued.exceptions;
   }, []);
 
@@ -179,14 +188,16 @@ export function useDesk(): Desk {
         setRunningId(id);
         void loadBoard().catch(() => undefined);
 
+        // The run is only over when the counters agree that it is. Clearing
+        // `pending` before the refetch lands leaves the screen readable but a
+        // beat behind — the refusal on screen next to "Refused 0".
         const finish = (message?: string) => {
           closeStream.current = null;
           setRunningId(null);
-          setPending(null);
           if (message) setError(message);
-          void Promise.all([loadBoard(), loadDetail(id)]).catch(
-            (failure: unknown) => setError(say(failure)),
-          );
+          void Promise.all([loadBoard(), loadDetail(id)])
+            .catch((failure: unknown) => setError(say(failure)))
+            .finally(() => setPending(null));
         };
 
         closeStream.current = streamException(id, {

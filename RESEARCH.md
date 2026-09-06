@@ -169,6 +169,28 @@ reasoning-model handling is REQUIRED, not a nice-to-have:
   55 calls per minute of headroom, and investigations run one at a time, so it is fine
 - the `reasoning` field is useful for debugging but must never be stored as a Fact
 
+### TWO MORE, found in Phase 2 against `glm-4-7-flash` (2026-09-05)
+
+3. **`chat_template_kwargs: {"enable_thinking": false}` turns the reasoning off**, and it is
+   the single biggest reliability win of the build. Measured on the same prompt: **2.9 s and
+   150 completion tokens with it, against 19.7 s and 1,912 without** — and at
+   `max_tokens=800` without it, `content` came back **empty** because the whole budget went
+   into `reasoning`. `engine/model.py` sends it on every call. A provider that does not
+   understand the field ignores it, which is why (4) still exists.
+4. **Empty content is retried with more room, not more patience.** `MODEL_MAX_TOKENS` (800)
+   is the starting budget; on a reasoning-only reply the retry doubles it (800 -> 1600 ->
+   3200) with no sleep. HTTP 429/5xx keep the ordinary backoff. Floor of 600 enforced.
+
+### A FIFTH, found while hardening (2026-09-06)
+
+5. **The model will invert a finding if the prompt lets it.** Asked to justify the
+   `missing_po` decision on E4, it wrote *"Exception E4 is invalid because the supplier
+   confirmed there is no order number"* — backwards, since the supplier confirming it is what
+   makes the exception real. It had reached for a valid/invalid verdict nobody asked for.
+   `RATIONALE_SYSTEM` now states that the exception is an established finding raised by a
+   deterministic match, forbids the words valid/invalid/unfounded/false positive, and fixes
+   the order of the paragraph. Fixed in the prompt, not filtered out of the prose afterwards.
+
 ### TWO GOTCHAS found in that very first call — both would corrupt evidence silently
 
 1. **It wraps JSON in a markdown code fence.** The reply was ```` ```json
@@ -217,6 +239,11 @@ Latest **v0.12.10**, published 2026-08-31. Windows asset: `agent-orchestrator-wi
 
 1. TensorMux model id + base URL (record above once the free endpoint is live for us).
 2. AO on Windows with this two-folder repo — confirmed in the practice session?
-3. Do the AP statistics' primary pages still say what the AI Overview summarised? Open two of
-   them before the README quotes numbers.
+3. ~~Do the AP statistics' primary pages still say what the AI Overview summarised?~~
+   **STILL OPEN, and the README says so out loud (2026-09-06).** The pages were not re-opened:
+   this file records the publishers but not their URLs, and guessing article URLs is exactly
+   what rule 5 forbids. The README therefore cites each figure to its publisher with the
+   2026-09-03 collection date and states plainly that these are secondary citations. Every
+   other number in the README came out of a real run. If anyone gets a browser on the primary
+   pages before submission, put the URLs here and drop that caveat.
 4. Do Syndicate participants get extra TensorMux credit? Ask in `#syndicate-help`.
