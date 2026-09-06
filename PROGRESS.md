@@ -9,6 +9,13 @@
   beats can be driven from the screen with nothing else open** — no terminal, no curl, no
   mock data. `npm run typecheck`, `npm run lint` and `npm run build` are clean.
   Detail in `desk/PROGRESS.md`.
+  - **The desk was then rebuilt as a proper app** (S8): shadcn/ui on Base UI, a sidebar, and
+    five views — Queue, Exception, Policies, **Audit** and **Settings** — instead of three
+    panels with no navigation. The Queue carries a dismissible three-step guide card
+    (Work E1 → Approve it → Work E2), so a judge with three minutes knows exactly where to
+    click. Phosphor icons only, no Lucide; Tieout's fonts, radius ladder, squircle corners and
+    inset shadows are untouched, with shadcn's tokens mapped onto the existing palette.
+    Audit makes the whole evidence trail browsable in time order across every exception.
   - Work E1 → the facts land live, each with its source chip, its link, the time and whether
     code or the model read it; the portal fact carries its screenshot.
   - Approve as **Chris, Controller** → `SHORT-SHIP-01 v1` appears on the right with his name
@@ -109,6 +116,15 @@ Open AO. Session S1 on the `world` module. Read `backend/PLAN.md`. Go.
 
 ## Session log
 
+- **2026-09-06 (S8, `desk`)** — the desk rebuilt as a real app: `shadcn@latest init` on the
+  existing Next 16 / Tailwind v4 project (registry `@shadcn`, Base UI), a sidebar and five
+  views, a three-step guide card on the queue, an Audit view over every fact and decision, a
+  Settings view that can repoint the API, and sonner toasts for the rule-learned and
+  auto-cleared moments. The icon library is set to Phosphor in `components.json`, so the CLI
+  rewrote every registry icon on the way in; `lucide-react` and `next-themes` were removed.
+  The design system was kept and shadcn's semantic tokens mapped onto it. Driven end to end
+  against the live API in a real Chromium at 1600px and 700px with zero page errors; the four
+  beats all pass from the screen. No backend file was touched.
 - **2026-09-06 (S4, `desk`)** — Phase 4 finished inside the window: steps 4b, 4c and 4d,
   plus a live browser panel that was not in the plan. The desk's types were reconciled
   against the real `engine/models.py` (4a had guessed them from `backend/PLAN.md` and got

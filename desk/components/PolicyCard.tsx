@@ -1,7 +1,23 @@
 import { Stamp } from "@phosphor-icons/react";
 
+import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import type { PolicyRow } from "@/lib/api-types";
-import { actionLabel, day, exceptionKindLabel, factKindLabel, money } from "@/lib/format";
+import {
+  actionLabel,
+  day,
+  exceptionKindLabel,
+  factKindLabel,
+  money,
+} from "@/lib/format";
 
 /**
  * A rule Tieout learned from exactly one human decision.
@@ -14,78 +30,79 @@ import { actionLabel, day, exceptionKindLabel, factKindLabel, money } from "@/li
 export function PolicyCard({ row, fresh }: { row: PolicyRow; fresh: boolean }) {
   const { policy, cited_by } = row;
   return (
-    <article
-      className={`rounded-lg bg-white p-3.5 ${
-        fresh ? "surface-raised animate-land" : "surface"
-      } ${policy.active ? "" : "opacity-60"}`}
+    <Card
+      className={`${fresh ? "surface-raised animate-land" : ""} ${
+        policy.active ? "" : "opacity-60"
+      }`}
     >
-      <header className="flex items-baseline gap-2">
-        <span className="font-mono text-[12px] font-medium">{policy.id}</span>
-        <span
-          className={`font-mono text-[11px] ${
-            policy.active ? "text-ledger" : "text-faint"
-          }`}
-        >
-          v{policy.version}
-        </span>
-        <span className="text-faint ml-auto text-[11px]">
-          {policy.active ? "active" : "superseded"}
-        </span>
-      </header>
+      <CardHeader>
+        <CardTitle className="font-display text-[16px] font-[500]">
+          {policy.name}
+        </CardTitle>
+        <CardDescription className="font-mono text-[12px]">
+          {policy.id} · v{policy.version}
+        </CardDescription>
+        <CardAction>
+          <Badge variant={policy.active ? "ledger" : "outline"}>
+            {policy.active ? "active" : "superseded"}
+          </Badge>
+        </CardAction>
+      </CardHeader>
 
-      <h3 className="font-display mt-1 text-[15px] leading-snug font-[500]">
-        {policy.name}
-      </h3>
+      <CardContent className="flex flex-col gap-3">
+        <dl className="flex flex-col gap-2">
+          <div>
+            <dt className="text-faint text-[11px] font-medium tracking-[0.1em] uppercase">
+              When
+            </dt>
+            <dd className="text-muted-foreground mt-0.5 text-[12px] leading-relaxed">
+              {conditionLines(row).join("; ")}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-faint text-[11px] font-medium tracking-[0.1em] uppercase">
+              Then
+            </dt>
+            <dd className="mt-0.5 text-[12px]">{actionLabel(policy.action)}</dd>
+          </div>
+        </dl>
 
-      <dl className="mt-3 space-y-2">
-        <div>
-          <dt className="text-faint text-[11px] font-medium tracking-[0.1em] uppercase">
-            When
-          </dt>
-          <dd className="text-muted mt-0.5 text-[12px] leading-relaxed">
-            {conditionLines(row).join("; ")}
-          </dd>
+        <p className="text-ledger flex items-start gap-1.5 text-[12px] leading-snug font-medium">
+          <Stamp size={13} weight="fill" className="mt-[2px] shrink-0" aria-hidden />
+          <span>
+            {policy.approved_by} · {day(policy.approved_at)}
+          </span>
+        </p>
+
+        <div className="flex flex-col gap-1 font-mono text-[11px]">
+          <p className="text-faint">
+            learned from {policy.learned_from} · {policy.learned_from_invoice}
+            {policy.supersedes_version !== null
+              ? ` · replaces v${policy.supersedes_version}`
+              : ""}
+          </p>
+          <p>
+            <span className="text-faint">cited by </span>
+            <span className={cited_by.length ? "text-ledger" : "text-faint"}>
+              {cited_by.length ? cited_by.join(", ") : "nothing yet"}
+            </span>
+          </p>
         </div>
-        <div>
-          <dt className="text-faint text-[11px] font-medium tracking-[0.1em] uppercase">
-            Then
-          </dt>
-          <dd className="mt-0.5 text-[12px]">{actionLabel(policy.action)}</dd>
-        </div>
-      </dl>
 
-      <p className="text-ledger mt-3 flex items-start gap-1.5 text-[12px] leading-snug font-medium">
-        <Stamp size={13} weight="fill" className="mt-[2px] shrink-0" aria-hidden />
-        <span>
-          {policy.approved_by} · {day(policy.approved_at)}
-        </span>
-      </p>
+        <Separator />
 
-      <p className="text-faint mt-2 font-mono text-[11px]">
-        learned from {policy.learned_from} · {policy.learned_from_invoice}
-        {policy.supersedes_version !== null
-          ? ` · replaces v${policy.supersedes_version}`
-          : ""}
-      </p>
-
-      <p className="mt-1 font-mono text-[11px]">
-        <span className="text-faint">cited by </span>
-        <span className={cited_by.length ? "text-ledger" : "text-faint"}>
-          {cited_by.length ? cited_by.join(", ") : "nothing yet"}
-        </span>
-      </p>
-
-      <p className="text-faint mt-3 border-t border-black/6 pt-2.5 text-[12px] leading-relaxed">
-        {policy.rationale}
-        <span className="font-mono">
-          {" "}
-          ({policy.drafted_by === "code"
-            ? "drafted by code"
-            : `drafted by ${policy.drafted_by}, clamped by code`}
-          )
-        </span>
-      </p>
-    </article>
+        <p className="text-faint text-[12px] leading-relaxed">
+          {policy.rationale}
+          <span className="font-mono">
+            {" "}
+            ({policy.drafted_by === "code"
+              ? "drafted by code"
+              : `drafted by ${policy.drafted_by}, clamped by code`}
+            )
+          </span>
+        </p>
+      </CardContent>
+    </Card>
   );
 }
 

@@ -16,7 +16,7 @@ export function ConfidenceBar({
 }) {
   return (
     <div className="flex items-center gap-3">
-      <div className="well h-1.5 flex-1 overflow-hidden rounded-xs bg-mist">
+      <div className="well h-1.5 flex-1 overflow-hidden rounded-xs bg-muted">
         <div
           className={`h-full rounded-xs transition-[width] duration-700 ease-out ${
             tone === "ledger" ? "bg-ledger" : "bg-faint"
@@ -26,7 +26,7 @@ export function ConfidenceBar({
       </div>
       <span
         className={`font-mono text-[13px] font-medium ${
-          tone === "ledger" ? "text-ledger" : "text-muted"
+          tone === "ledger" ? "text-ledger" : "text-muted-foreground"
         }`}
       >
         {percent(value)}

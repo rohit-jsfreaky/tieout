@@ -1,4 +1,94 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/* shadcn's components carry `dark:` classes. Tieout is a light-only screen — a
+   printed ledger does not have a night mode — so the dark variant is bound to a
+   class we never add, rather than to the reader's OS preference. */
+@custom-variant dark (&:is(.dark *));
+
+/* ---------------------------------------------------------------------------
+   Tieout's palette, and shadcn's semantic layer mapped onto it.
+
+   The palette is the design system: three inks, two grounds, one accent. The
+   block under it is the ONLY place shadcn's vocabulary meets ours — every
+   shadcn component reads `--background`, `--muted-foreground`, `--border` and
+   friends, and every one of them resolves to a Tieout value. There is no second
+   palette anywhere in this folder.
+   --------------------------------------------------------------------------- */
+:root {
+  --ink: #0a0b0c;
+  --muted-ink: #737373;
+  --faint: #a1a1a1;
+  --mist: #f5f5f5;
+  --soft: #fafafa;
+  --ledger: #14508c;
+
+  --background: #ffffff;
+  --foreground: var(--ink);
+  --card: #ffffff;
+  --card-foreground: var(--ink);
+  --popover: #ffffff;
+  --popover-foreground: var(--ink);
+
+  /* Ink, not blue. The accent stays rationed: eyebrows, ticks, the winning
+     number, and the one row of the sidebar you are standing on. */
+  --primary: var(--ink);
+  --primary-foreground: #ffffff;
+  --secondary: var(--mist);
+  --secondary-foreground: var(--ink);
+  --muted: var(--mist);
+  --muted-foreground: var(--muted-ink);
+  --accent: var(--mist);
+  --accent-foreground: var(--ink);
+
+  /* Defined so the primitives are whole; the screen never uses it. Tieout has
+     no red state — a refusal is an outcome, not an error. */
+  --destructive: #8c2314;
+
+  --border: rgb(10 11 12 / 0.08);
+  --input: rgb(10 11 12 / 0.12);
+  --ring: var(--ledger);
+  --radius: 14px;
+
+  --sidebar: var(--soft);
+  --sidebar-foreground: var(--ink);
+  --sidebar-primary: var(--ledger);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: color-mix(in oklab, var(--ledger) 9%, #ffffff);
+  --sidebar-accent-foreground: var(--ledger);
+  --sidebar-border: rgb(10 11 12 / 0.08);
+  --sidebar-ring: var(--ledger);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
 
 @theme {
   /* A ledger serif for headings over a quiet grotesque body. Digits live in the
@@ -6,11 +96,13 @@
   --font-display: "Fraunces Variable", ui-serif, Georgia, "Times New Roman", serif;
   --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Geist Mono Variable", ui-monospace, "Cascadia Code", monospace;
+  --font-heading: var(--font-display);
 
-  /* Three inks, two grounds, one accent. Nothing else.
-     The accent is for eyebrows, ticks and the winning number — nowhere else. */
+  /* The palette by its Tieout names, so the desk's own components can keep
+     saying `text-faint` and `bg-ledger` instead of borrowing a shadcn word for
+     a shade shadcn has no name for. `muted` is the one that moved: it is a
+     shadcn SURFACE, so the muted ink is `text-muted-foreground` now. */
   --color-ink: #0a0b0c;
-  --color-muted: #737373;
   --color-faint: #a1a1a1;
   --color-mist: #f5f5f5;
   --color-soft: #fafafa;
@@ -60,6 +152,7 @@
   ::before,
   ::after {
     corner-shape: squircle;
+    @apply border-border outline-ring/50;
   }
 
   /* …except true capsules. A pill should stay a pill, as it does on iOS. */
@@ -73,8 +166,7 @@
   }
 
   body {
-    background: #ffffff;
-    color: var(--color-ink);
+    @apply bg-background text-foreground;
     font-family: var(--font-sans);
     /* Every figure on this screen is money, a quantity or a count. Tabular by
        default so columns of digits align without anyone remembering to ask. */

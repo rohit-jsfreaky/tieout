@@ -6,7 +6,7 @@ import type { Check } from "@/lib/api-types";
 export function ChecklistLines({ checks }: { checks: Check[] }) {
   if (checks.length === 0) return null;
   return (
-    <ul className="mt-3 space-y-1.5">
+    <ul className="flex flex-col gap-1.5">
       {checks.map((check) => (
         <li key={check.name} className="flex items-start gap-2 text-[12px]">
           {check.passed ? (
@@ -24,7 +24,7 @@ export function ChecklistLines({ checks }: { checks: Check[] }) {
               aria-hidden
             />
           )}
-          <span className={check.passed ? "text-muted" : "text-faint"}>
+          <span className={check.passed ? "text-muted-foreground" : "text-faint"}>
             {check.name}
             <span className="text-faint"> — {check.detail}</span>
           </span>

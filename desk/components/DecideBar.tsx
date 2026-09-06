@@ -2,6 +2,33 @@
 
 import { useState } from "react";
 
+import { Check, PencilSimple, Prohibit } from "@phosphor-icons/react";
+
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { Spinner } from "@/components/ui/spinner";
 import type { DecidableAction } from "@/lib/api-types";
 
 /**
@@ -10,6 +37,9 @@ import type { DecidableAction } from "@/lib/api-types";
  * Approve means "do what Tieout proposed" — the engine resolves it into the real
  * action and records that. Edit is for the times it proposed the wrong thing:
  * pick what should happen instead and say why, in the same breath.
+ *
+ * The approver's name is on this card and not somewhere else, because it is
+ * about to be stamped onto a rule that will clear invoices without asking again.
  */
 const EDITS: { value: DecidableAction; label: string }[] = [
   { value: "short_pay", label: "Short-pay the difference" },
@@ -20,11 +50,13 @@ const EDITS: { value: DecidableAction; label: string }[] = [
 
 export function DecideBar({
   approver,
+  setApprover,
   busy,
   disabled,
   onDecide,
 }: {
   approver: string;
+  setApprover: (name: string) => void;
   busy: boolean;
   disabled: boolean;
   onDecide: (action: DecidableAction, note: string) => void;
@@ -40,80 +72,120 @@ export function DecideBar({
   };
 
   const stop = busy || disabled;
+  const named = approver.trim();
 
   return (
-    <div className="mt-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          disabled={stop}
-          onClick={() => send("approve")}
-          className="bg-ledger rounded-md px-4 py-2 text-[13px] font-medium text-white disabled:opacity-40"
-        >
-          {busy ? "Recording…" : "Approve"}
-        </button>
-        <button
-          type="button"
-          disabled={stop}
-          onClick={() => send("reject")}
-          className="surface rounded-md bg-white px-4 py-2 text-[13px] font-medium disabled:opacity-40"
-        >
-          Reject
-        </button>
-        <button
-          type="button"
-          disabled={stop}
-          onClick={() => setEditing((open) => !open)}
-          className="surface rounded-md bg-white px-4 py-2 text-[13px] font-medium disabled:opacity-40"
-          aria-expanded={editing}
-        >
-          Edit
-        </button>
-        <span className="text-faint ml-auto text-[12px]">
-          as {approver.trim() || "— nobody —"}
-        </span>
-      </div>
+    <Card>
+      <CardHeader>
+        <CardTitle>Your decision</CardTitle>
+        <CardDescription>
+          One click, once. Tieout learns the rule from it and stops asking.
+        </CardDescription>
+      </CardHeader>
 
-      {editing ? (
-        <div className="surface mt-3 rounded-md bg-white p-3">
-          <label className="text-faint block text-[11px] font-medium tracking-[0.1em] uppercase">
-            Do this instead
-          </label>
-          <select
-            value={action}
-            onChange={(event) =>
-              setAction(event.target.value as DecidableAction)
-            }
-            className="well mt-2 w-full rounded-sm bg-soft px-3 py-2 text-[13px] outline-none"
+      <CardContent className="flex flex-col gap-4">
+        <FieldGroup>
+          <Field orientation="responsive">
+            <FieldLabel htmlFor="approver">Approver</FieldLabel>
+            <Input
+              id="approver"
+              name="approver"
+              value={approver}
+              onChange={(event) => setApprover(event.target.value)}
+              placeholder="Chris, Controller"
+              className="sm:max-w-64"
+            />
+            <FieldDescription>
+              This name goes on the rule, and every later auto-clear cites it.
+            </FieldDescription>
+          </Field>
+        </FieldGroup>
+
+        <Separator />
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="ledger"
+            size="lg"
+            disabled={stop || named === ""}
+            onClick={() => send("approve")}
           >
-            {EDITS.map((edit) => (
-              <option key={edit.value} value={edit.value}>
-                {edit.label}
-              </option>
-            ))}
-          </select>
-
-          <label className="text-faint mt-3 block text-[11px] font-medium tracking-[0.1em] uppercase">
-            Why — this goes on the rule
-          </label>
-          <input
-            type="text"
-            value={note}
-            onChange={(event) => setNote(event.target.value)}
-            placeholder="Northwind always ships the balance next week."
-            className="well placeholder:text-faint mt-2 w-full rounded-sm bg-soft px-3 py-2 text-[13px] outline-none"
-          />
-
-          <button
-            type="button"
+            {busy ? (
+              <Spinner data-icon="inline-start" />
+            ) : (
+              <Check weight="bold" data-icon="inline-start" />
+            )}
+            Approve
+          </Button>
+          <Button
+            variant="outline"
+            size="lg"
+            disabled={stop || named === ""}
+            onClick={() => send("reject")}
+          >
+            <Prohibit data-icon="inline-start" />
+            Reject
+          </Button>
+          <Button
+            variant="outline"
+            size="lg"
             disabled={stop}
-            onClick={() => send(action)}
-            className="bg-ink mt-3 rounded-md px-4 py-2 text-[13px] font-medium text-white disabled:opacity-40"
+            aria-expanded={editing}
+            onClick={() => setEditing((open) => !open)}
           >
-            Record it
-          </button>
+            <PencilSimple data-icon="inline-start" />
+            Edit
+          </Button>
+          <span className="text-faint ml-auto text-[12px]">
+            as {named || "— nobody —"}
+          </span>
         </div>
-      ) : null}
-    </div>
+
+        {editing ? (
+          <FieldGroup className="animate-land">
+            <Field>
+              <FieldLabel htmlFor="instead">Do this instead</FieldLabel>
+              <Select
+                items={EDITS}
+                value={action}
+                onValueChange={(value) => setAction(value as DecidableAction)}
+              >
+                <SelectTrigger id="instead" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {EDITS.map((edit) => (
+                      <SelectItem key={edit.value} value={edit.value}>
+                        {edit.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </Field>
+
+            <Field>
+              <FieldLabel htmlFor="why">Why — this goes on the rule</FieldLabel>
+              <Input
+                id="why"
+                value={note}
+                onChange={(event) => setNote(event.target.value)}
+                placeholder="Northwind always ships the balance next week."
+              />
+            </Field>
+
+            <Button
+              size="lg"
+              className="self-start"
+              disabled={stop || named === ""}
+              onClick={() => send(action)}
+            >
+              Record it
+            </Button>
+          </FieldGroup>
+        ) : null}
+      </CardContent>
+    </Card>
   );
 }

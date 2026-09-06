@@ -22,8 +22,8 @@ export function LiveTrail({ events }: { events: EngineEvent[] }) {
   if (events.length === 0) return null;
 
   return (
-    <div className="well max-h-28 overflow-y-auto rounded-md bg-soft px-3 py-2">
-      <ul className="space-y-1">
+    <div className="well max-h-32 overflow-y-auto rounded-md bg-soft px-3 py-2">
+      <ul className="flex flex-col gap-1">
         {events.map((event, index) => (
           <li
             key={`${event.at}-${index}`}
@@ -36,7 +36,7 @@ export function LiveTrail({ events }: { events: EngineEvent[] }) {
               className={
                 event.kind === "auto_cleared" || event.kind === "policy_learned"
                   ? "text-ledger font-medium"
-                  : "text-muted"
+                  : "text-muted-foreground"
               }
             >
               {event.message}
