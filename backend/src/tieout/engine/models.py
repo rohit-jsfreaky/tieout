@@ -50,6 +50,8 @@ class DecisionAction(StrEnum):
     ATTACH_PO = "attach_po"
     REJECT = "reject"
     REFUSE = "refuse"
+    #: The approver is not allowed to sign this much. Nothing is paid and nothing is learned.
+    ESCALATE = "escalate"
 
 
 class ExceptionStatus(StrEnum):
@@ -58,6 +60,28 @@ class ExceptionStatus(StrEnum):
     REFUSED = "refused"
     AUTO_CLEARED = "auto_cleared"
     RESOLVED = "resolved"
+    ESCALATED = "escalated"
+
+
+class Role(StrEnum):
+    """A seat in the delegation-of-authority matrix. The limits live in ``authority.py``."""
+
+    AP_CLERK = "AP Clerk"
+    CONTROLLER = "Controller"
+    CFO = "CFO"
+
+
+class Approver(BaseModel):
+    """The person behind a decision: a name AND what they are allowed to approve."""
+
+    name: str
+    role: Role
+
+    @computed_field
+    @property
+    def label(self) -> str:
+        """``"Chris, Controller"`` — what goes on the decision and on the rule."""
+        return f"{self.name}, {self.role.value}"
 
 
 # --------------------------------------------------------------------------------------
@@ -234,9 +258,16 @@ class Decision(BaseModel):
     auto: bool = False
     cited_policy: str | None = None
     approved_by: str | None = None
+    #: The approver's seat in the delegation-of-authority matrix. Recorded next to the name,
+    #: because "Chris approved it" is only auditable if you know what Chris may approve.
+    approved_role: Role | None = None
     decided_at: datetime
     amount_payable: float | None = None
     attach_po: str | None = None
+    #: The money this decision authorises leaving the company — see ``authority.py``.
+    amount_for_authority: float | None = None
+    #: The lowest seat in the matrix that may sign that amount off.
+    authority_needed: Role | None = None
     note: str = ""
 
 
@@ -312,6 +343,11 @@ class Policy(BaseModel):
     rationale: str
     drafted_by: str = "code"
     approved_by: str
+    approved_role: Role
+    #: **Segregation of duties.** A rule may never clear more than the person who approved it
+    #: could have cleared by hand, so it carries their limit for as long as it lives.
+    #: ``None`` only when a CFO approved it. Enforced in ``policy.covers``.
+    authority_ceiling: float | None = None
     approved_at: datetime
     learned_from: str
     learned_from_invoice: str

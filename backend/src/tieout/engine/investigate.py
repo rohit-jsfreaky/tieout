@@ -15,16 +15,18 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime
 
-from . import decide, policy, store
+from . import authority, decide, policy, store
 from .events import Event, EventKind, EventSink, null_sink
 from .evidence import EvidenceTrail
 from .models import (
+    Approver,
     Decision,
     DecisionAction,
     EvidencePack,
     ExceptionCase,
     ExceptionStatus,
     Policy,
+    Role,
     Source,
 )
 from .sources import erp as erp_source
@@ -156,21 +158,32 @@ def apply_human_decision(
     *,
     action: DecisionAction,
     by: str,
+    role: str | Role | None = None,
     note: str = "",
     sink: EventSink = null_sink,
     today: date | None = None,
 ) -> tuple[Decision, Policy | None]:
-    """Record what the human decided, then learn the rule that makes it the last time."""
+    """Record what the human decided, then learn the rule that makes it the last time.
+
+    Unless they are not allowed to decide it. An amount above the approver's own limit in the
+    delegation-of-authority matrix is escalated rather than recorded: nothing is paid, nothing
+    is learned, and the trail says who it needs instead.
+    """
     pack = store.get_pack(case.id)
     if pack is None:
         raise NotInvestigated(f"{case.id} has not been investigated yet — run work first")
 
+    approver = authority.approver_for(by, role)
     proposal = pack.proposal
     resolved = action
     if action is DecisionAction.APPROVE and proposal is not None:
         # "Approve" means "do what Tieout proposed", so the trail records the real action.
         if proposal.action not in {DecisionAction.REFUSE, DecisionAction.REJECT}:
             resolved = proposal.action
+
+    signing = authority.amount_under_authority(case, resolved)
+    if not authority.within_limit(approver.role, signing):
+        return _escalate(case, pack, approver, signing, note, sink), None
 
     summary, payable, attach = decide.action_detail(case, resolved)
     checks = decide.checklist(case, pack.facts)
@@ -179,17 +192,21 @@ def apply_human_decision(
         action=resolved,
         summary=summary,
         rationale=(
-            f"{by} decided this by hand on {datetime.now():%d %B %Y}"
-            + (f": {note}" if note else ".")
+            f"{approver.label} decided this by hand on {datetime.now():%d %B %Y}, authorising "
+            f"{signing:,.2f} {case.currency} "
+            f"{authority.against_limit(approver.role)}" + (f": {note}" if note else ".")
         ),
         rationale_by="human",
         confidence=decide.confidence(checks),
         checks=checks,
         auto=False,
-        approved_by=by,
+        approved_by=approver.label,
+        approved_role=approver.role,
         decided_at=datetime.now(),
         amount_payable=payable,
         attach_po=attach,
+        amount_for_authority=signing,
+        authority_needed=authority.role_needed_for(signing),
         note=note,
     )
     store.save_decision(decision)
@@ -198,10 +215,61 @@ def apply_human_decision(
         Event(
             kind=EventKind.DECIDED,
             exception_id=case.id,
-            message=f"{by} chose {resolved.value}. {summary}",
+            message=f"{approver.label} chose {resolved.value}. {summary}",
             decision=decision,
         )
     )
 
-    learned = policy.learn(pack, decision, approved_by=by, today=today, sink=sink)
+    learned = policy.learn(pack, decision, approved_by=approver, today=today, sink=sink)
     return decision, learned
+
+
+def _escalate(
+    case: ExceptionCase,
+    pack: EvidencePack,
+    approver: Approver,
+    signing: float,
+    note: str,
+    sink: EventSink,
+) -> Decision:
+    """Beat four's sibling: the agent knows what it found, and who is allowed to sign it.
+
+    An escalation is an outcome, not an error. It goes on the trail with the name of the
+    person who tried, so a month later it is clear the control fired rather than that
+    somebody forgot.
+    """
+    needed = authority.role_needed_for(signing)
+    sentence = authority.over_limit_sentence(approver.role, signing, case.currency)
+    decision = Decision(
+        exception_id=case.id,
+        action=DecisionAction.ESCALATE,
+        summary=sentence,
+        rationale=(
+            f"{approver.label} tried to settle {case.invoice_id} on {datetime.now():%d %B %Y}. "
+            f"{sentence} Nothing has been paid and no rule was learned: a rule may never "
+            f"clear more than the person who approved it could have cleared by hand. "
+            f"Everything Tieout found is on the trail, waiting for a {needed.value}."
+            + (f" Note from {approver.name}: {note}" if note else "")
+        ),
+        rationale_by="code",
+        confidence=decide.confidence(decide.checklist(case, pack.facts)),
+        checks=decide.checklist(case, pack.facts),
+        auto=False,
+        approved_by=approver.label,
+        approved_role=approver.role,
+        decided_at=datetime.now(),
+        amount_for_authority=signing,
+        authority_needed=needed,
+        note=note,
+    )
+    store.save_decision(decision)
+    store.set_status(case.id, ExceptionStatus.ESCALATED)
+    sink(
+        Event(
+            kind=EventKind.ESCALATED,
+            exception_id=case.id,
+            message=f"Blocked: {sentence}",
+            decision=decision,
+        )
+    )
+    return decision

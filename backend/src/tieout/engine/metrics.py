@@ -29,7 +29,13 @@ def compute() -> Metrics:
         awaiting_human=sum(
             1
             for case in cases
-            if case.status in {ExceptionStatus.PROPOSED, ExceptionStatus.REFUSED}
+            # An escalation is waiting on a person too — just on a more senior one.
+            if case.status
+            in {
+                ExceptionStatus.PROPOSED,
+                ExceptionStatus.REFUSED,
+                ExceptionStatus.ESCALATED,
+            }
         ),
         human_touches=sum(
             1 for decision in decisions if not decision.auto and decision.approved_by

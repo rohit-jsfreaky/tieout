@@ -1,4 +1,4 @@
-"""Nine routes over the exception loop. No logic lives here.
+"""Ten routes over the exception loop. No logic lives here.
 
     GET  /queue                        the exceptions, with where each one got to
     GET  /exceptions/{id}              the evidence pack and the proposed decision
@@ -6,6 +6,7 @@
     GET  /exceptions/{id}/events       SSE: the engine's own events, live
     POST /exceptions/{id}/decide       record a human decision, return the rule it learned
     GET  /policies                     every rule, every version, and what it has cleared
+    GET  /authority                    the delegation-of-authority matrix, as the engine holds it
     GET  /metrics                      human touches, auto-clears, evidence, citations
     POST /reset                        the world and Tieout's memory back to the seed
     GET  /screenshots/{name}           the PNG a portal Fact points at, as bytes
@@ -29,12 +30,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from sse_starlette.sse import EventSourceResponse, ServerSentEvent
 
-from ..engine import investigate, load_env, metrics, policy, store
+from ..engine import authority, investigate, load_env, metrics, policy, store
 from ..engine.events import Event
 from ..engine.models import Decision, DecisionAction, ExceptionCase, Metrics, Policy
 from ..engine.sources.portal import screenshot_dir
 from . import runner
 from .schemas import (
+    AuthorityResponse,
+    AuthorityRow,
     DecideRequest,
     DecideResponse,
     ExceptionDetail,
@@ -221,11 +224,14 @@ def decide(exception_id: str, body: DecideRequest) -> DecideResponse:
             case,
             action=DecisionAction(body.action),
             by=body.by,
+            role=body.role,
             note=body.note,
             sink=lambda event: runner.emit(case.id, event),
         )
     except investigate.NotInvestigated as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except authority.UnknownRole as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return DecideResponse(
         exception=store.get_exception(case.id) or case,
         decision=decision,
@@ -240,6 +246,25 @@ def policies() -> PoliciesResponse:
     return PoliciesResponse(
         count=len(rules),
         policies=[PolicyRow(policy=rule, cited_by=policy.citations(rule.id)) for rule in rules],
+    )
+
+
+@app.get("/authority", response_model=AuthorityResponse)
+def authority_matrix() -> AuthorityResponse:
+    """The delegation-of-authority matrix the engine enforces, read straight off the constant.
+
+    The desk needs the seats to offer them, and the limits to say "above a Controller's
+    10,000" without inventing the number. Publishing it here keeps the matrix in one place:
+    ``engine/authority.py`` decides, and everything else quotes it.
+    """
+    return AuthorityResponse(
+        matrix=[
+            AuthorityRow(role=role, limit=authority.limit_for(role)) for role in authority.LADDER
+        ],
+        note=(
+            "Delegation of authority. A real deployment reads this from the company's own "
+            "approval matrix; Tieout enforces whatever it is told."
+        ),
     )
 
 

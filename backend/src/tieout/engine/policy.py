@@ -14,6 +14,12 @@ and the condition that actually gets evaluated is a handful of comparisons a rea
 in ten seconds. That is what makes "auto-cleared, citing SHORT-SHIP-01 v1, approved by Chris,
 Controller" reproducible rather than a story.
 
+**A rule can never clear more than the person who approved it could have cleared by hand.**
+Every Policy carries that person's approval limit from the delegation-of-authority matrix
+(``authority.py``) and ``covers`` enforces it, so a Controller's approval cannot quietly turn
+into a rule that settles a 50,000 invoice at three in the morning. That is segregation of
+duties, and it is a comparison in this file rather than a promise in a README.
+
 Nothing is ever deleted. A rule that stops being right is superseded by a new version, and
 the old version stays on the record with the date it stopped applying.
 """
@@ -22,10 +28,11 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from . import decide, store
+from . import authority, decide, store
 from . import model as llm
 from .events import Event, EventKind, EventSink, null_sink
 from .models import (
+    Approver,
     Decision,
     DecisionAction,
     EvidencePack,
@@ -109,7 +116,7 @@ def learn(
     pack: EvidencePack,
     decision: Decision,
     *,
-    approved_by: str,
+    approved_by: Approver,
     today: date | None = None,
     sink: EventSink = null_sink,
 ) -> Policy | None:
@@ -133,7 +140,7 @@ def learn(
         return None
 
     measured = observed_variance(case)
-    draft, drafted_by = _draft(case, decision, approved_by, measured, today)
+    draft, drafted_by = _draft(case, decision, approved_by.label, measured, today)
     tolerance = _clamp_tolerance(case.kind, draft.tolerance_pct, measured)
     condition = PolicyCondition(
         kind=case.kind,
@@ -152,6 +159,13 @@ def learn(
             f"{case.vendor_name}, which is what the evidence covers.)"
         )
 
+    # The rule inherits the approver's own limit and never outgrows it.
+    ceiling = authority.limit_for(approved_by.role)
+    rationale += (
+        f" It can only clear payments a {approved_by.role.value} could have made by hand: "
+        f"{authority.describe_limit(approved_by.role)}."
+    )
+
     existing = _active_for(case.kind, case.vendor_id)
     now = datetime.now()
     if existing is None:
@@ -164,7 +178,9 @@ def learn(
             action=decision.action,
             rationale=rationale,
             drafted_by=drafted_by,
-            approved_by=approved_by,
+            approved_by=approved_by.label,
+            approved_role=approved_by.role,
+            authority_ceiling=ceiling,
             approved_at=now,
             learned_from=case.id,
             learned_from_invoice=case.invoice_id,
@@ -175,15 +191,15 @@ def learn(
                 kind=EventKind.POLICY_LEARNED,
                 exception_id=case.id,
                 message=(
-                    f"Learned {policy.ref}: {policy.name} — approved by {approved_by} on "
-                    f"{now:%Y-%m-%d}."
+                    f"Learned {policy.ref}: {policy.name} — approved by {approved_by.label} on "
+                    f"{now:%Y-%m-%d}, up to {authority.describe_limit(approved_by.role)}."
                 ),
                 policy=policy,
             )
         )
         return policy
 
-    if not _contradicts(existing, condition, decision.action):
+    if not _contradicts(existing, condition, decision.action, ceiling):
         sink(
             Event(
                 kind=EventKind.WARNING,
@@ -201,10 +217,11 @@ def learn(
         rationale=rationale,
         drafted_by=drafted_by,
         approved_by=approved_by,
+        ceiling=ceiling,
         learned_from=case.id,
         learned_from_invoice=case.invoice_id,
         sink=sink,
-        message_suffix=f"widened after {approved_by} approved {case.id}",
+        message_suffix=f"widened after {approved_by.label} approved {case.id}",
     )
 
 
@@ -270,7 +287,7 @@ def _rationale_for(case: ExceptionCase, decision: Decision, tolerance: float) ->
 
 
 def _narrow_after_rejection(
-    case: ExceptionCase, approved_by: str, sink: EventSink
+    case: ExceptionCase, approved_by: Approver, sink: EventSink
 ) -> Policy | None:
     """A human said no to something a rule would have cleared. The rule stops covering it."""
     existing = _active_for(case.kind, case.vendor_id)
@@ -292,10 +309,14 @@ def _narrow_after_rejection(
             "max_exposure": min(existing.condition.max_exposure or case.exposure, case.exposure),
         }
     )
+    # A rejection only ever narrows. So the ceiling is the tighter of the rule's and the
+    # rejector's — a CFO saying no must not accidentally raise what the rule may clear.
+    ceiling = _tighter(existing.authority_ceiling, authority.limit_for(approved_by.role))
     rationale = (
-        f"{approved_by} rejected {case.id} ({case.invoice_id}), which v{existing.version} "
-        f"would have cleared at {measured:g}%. The rule now stops at {tightened:g}%. "
-        f"Version {existing.version} is kept for anything decided while it applied."
+        f"{approved_by.label} rejected {case.id} ({case.invoice_id}), which "
+        f"v{existing.version} would have cleared at {measured:g}%. The rule now stops at "
+        f"{tightened:g}%. Version {existing.version} is kept for anything decided while it "
+        f"applied."
     )
     return _version_up(
         existing,
@@ -305,11 +326,21 @@ def _narrow_after_rejection(
         rationale=rationale,
         drafted_by="code",
         approved_by=approved_by,
+        ceiling=ceiling,
         learned_from=case.id,
         learned_from_invoice=case.invoice_id,
         sink=sink,
-        message_suffix=f"narrowed after {approved_by} rejected {case.id}",
+        message_suffix=f"narrowed after {approved_by.label} rejected {case.id}",
     )
+
+
+def _tighter(left: float | None, right: float | None) -> float | None:
+    """The lower of two ceilings, where ``None`` means no limit at all."""
+    if left is None:
+        return right
+    if right is None:
+        return left
+    return min(left, right)
 
 
 def _version_up(
@@ -320,7 +351,8 @@ def _version_up(
     name: str,
     rationale: str,
     drafted_by: str,
-    approved_by: str,
+    approved_by: Approver,
+    ceiling: float | None,
     learned_from: str,
     learned_from_invoice: str,
     sink: EventSink,
@@ -337,7 +369,9 @@ def _version_up(
         action=action,
         rationale=rationale,
         drafted_by=drafted_by,
-        approved_by=approved_by,
+        approved_by=approved_by.label,
+        approved_role=approved_by.role,
+        authority_ceiling=ceiling,
         approved_at=now,
         learned_from=learned_from,
         learned_from_invoice=learned_from_invoice,
@@ -355,12 +389,23 @@ def _version_up(
     return policy
 
 
-def _contradicts(existing: Policy, condition: PolicyCondition, action: DecisionAction) -> bool:
+def _contradicts(
+    existing: Policy,
+    condition: PolicyCondition,
+    action: DecisionAction,
+    ceiling: float | None,
+) -> bool:
     """A new version is only worth creating when the rule would actually behave differently."""
     if existing.action is not action:
         return True
     if _tolerance_of(existing) + 1e-9 < (
         condition.max_short_pct or condition.max_price_variance_pct or 0.0
+    ):
+        return True
+    # Someone with more authority approving the same shape raises what the rule may clear,
+    # and that is a change of behaviour worth its own version and its own name on it.
+    if existing.authority_ceiling is not None and (
+        ceiling is None or ceiling > existing.authority_ceiling + 1e-9
     ):
         return True
     new_exposure = condition.max_exposure or 0.0
@@ -412,6 +457,12 @@ def covers(policy: Policy, case: ExceptionCase, pack: EvidencePack) -> bool:
         return False
     if condition.max_exposure is not None and case.exposure > condition.max_exposure:
         return False
+    # Segregation of duties. The rule may not authorise a payment the person who approved it
+    # could not have authorised themselves, so it stops at their limit and escalates instead.
+    if policy.authority_ceiling is not None and (
+        authority.amount_under_authority(case, policy.action) > policy.authority_ceiling
+    ):
+        return False
     if any(not pack.has(kind) for kind in condition.requires):
         return False
     # A rule never rescues a weak pack: the class's own required check still has to pass.
@@ -430,13 +481,16 @@ def apply(policy: Policy, case: ExceptionCase, pack: EvidencePack) -> Decision:
 
     checks = decide.checklist(case, pack.facts)
     summary, payable, attach = decide.action_detail(case, policy.action)
+    signing = authority.amount_under_authority(case, policy.action)
+    ceiling = "no limit" if policy.authority_ceiling is None else f"{policy.authority_ceiling:,.2f}"
     rationale = (
         f"Auto-cleared under {policy.ref} — {policy.name} — approved by {policy.approved_by} "
         f"on {policy.approved_at:%d %B %Y}, learned from {policy.learned_from} "
         f"({policy.learned_from_invoice}). The rule applies when {policy.condition.describe()}. "
         f"This exception measures {observed_variance(case):g}% on "
         f"{case.exposure:,.2f} {case.currency}, and every piece of evidence the rule requires "
-        f"is on the trail. No human was needed."
+        f"is on the trail. It authorises {signing:,.2f} {case.currency} for payment, inside "
+        f"the {ceiling} a {policy.approved_role.value} may approve. No human was needed."
     )
     return Decision(
         exception_id=case.id,
@@ -449,9 +503,12 @@ def apply(policy: Policy, case: ExceptionCase, pack: EvidencePack) -> Decision:
         auto=True,
         cited_policy=policy.ref,
         approved_by=policy.approved_by,
+        approved_role=policy.approved_role,
         decided_at=datetime.now(),
         amount_payable=payable,
         attach_po=attach,
+        amount_for_authority=signing,
+        authority_needed=authority.role_needed_for(signing),
         note=f"cleared by policy {policy.ref}",
     )
 

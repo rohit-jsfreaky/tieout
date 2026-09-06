@@ -24,6 +24,7 @@ class EventKind(StrEnum):
     PROPOSED = "proposed"
     REFUSED = "refused"
     AUTO_CLEARED = "auto_cleared"
+    ESCALATED = "escalated"
     DECIDED = "decided"
     POLICY_LEARNED = "policy_learned"
     POLICY_VERSIONED = "policy_versioned"

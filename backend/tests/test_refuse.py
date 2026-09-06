@@ -15,6 +15,9 @@ from tieout.engine.sources.erp import ErpClient
 from tieout.engine.sources.inbox import InboxClient
 
 APPROVER = "Chris, Controller"
+# E5 is 12,750 — above a Controller's limit — so the person who signs it off by hand has
+# to be the CFO. That is the other half of test_authority.py, seen from here.
+SENIOR = "Dana, CFO"
 
 
 def test_the_unresolvable_invoice_is_refused_not_guessed(sources, cases) -> None:
@@ -47,9 +50,10 @@ def test_a_refusal_is_not_an_error_and_teaches_nothing(sources, cases) -> None:
 
     # A person can still decide it by hand, but there is no pattern to generalise.
     decision, learned = investigate_engine.apply_human_decision(
-        cases["E5"], action=DecisionAction.APPROVE, by=APPROVER, note="one-off, chased by phone"
+        cases["E5"], action=DecisionAction.APPROVE, by=SENIOR, note="one-off, chased by phone"
     )
-    assert decision.approved_by == APPROVER
+    assert decision.approved_by == SENIOR
+    assert decision.action is DecisionAction.APPROVE
     assert learned is None
     assert store.list_policies() == []
 
