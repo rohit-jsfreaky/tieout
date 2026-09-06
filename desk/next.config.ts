@@ -12,7 +12,12 @@ const nextConfig: NextConfig = {
   devIndicators: false,
   // Docker: ship a self-contained server instead of the whole node_modules tree.
   // Harmless locally — `next dev` ignores it.
-  output: "standalone",
+  //
+  // Not on Vercel, though. Vercel builds its own output and then traces the server
+  // files; standalone mode skips the trace manifest it looks for, and the build dies
+  // on `ENOENT: .next/next-server.js.nft.json`. Vercel sets VERCEL=1 during a build,
+  // so the desk ships standalone everywhere except there.
+  output: process.env.VERCEL ? undefined : "standalone",
 };
 
 export default nextConfig;
