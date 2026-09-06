@@ -1,9 +1,7 @@
 import { Sparkle } from "@phosphor-icons/react";
 
-import { Badge } from "@/components/ui/badge";
 import {
   Card,
-  CardAction,
   CardContent,
   CardHeader,
   CardTitle,
@@ -14,20 +12,28 @@ import { actionLabel, day, money } from "@/lib/format";
 
 import { ChecklistLines } from "./ChecklistLines";
 import { ConfidenceBar } from "./ConfidenceBar";
+import { Figure, FigureRow } from "./FigureRow";
+import { WhyThisDecision } from "./WhyThisDecision";
 
 /**
  * What Tieout wants to do, or what has already been done.
  *
- * Four states share one card, because they are the same object: the proposal
- * waiting for a person, the auto-clear that cited a learned rule, the decision a
- * person actually recorded — and the one they were not allowed to record, which
- * is an outcome with a name on it rather than an error.
+ * The most important thing on the view, so it is the biggest: the sentence in
+ * the display face, everything else beneath it. Four states share one card,
+ * because they are the same object: the proposal waiting for a person, the
+ * auto-clear that cited a learned rule, the decision a person actually recorded
+ * — and the one they were not allowed to record, which is an outcome with a
+ * name on it rather than an error.
+ *
+ * There is no badge here. The status of the exception is stated once, in the
+ * header at the top of the view; the action is a named figure like the others,
+ * because "Short-pay" is what Tieout wants to DO, not where the invoice stands.
  */
 export function DecisionCard({ decision }: { decision: Decision }) {
   const escalated = decision.action === "escalate";
   const settled = decision.approved_by !== null;
   return (
-    <Card>
+    <Card className="[--card-spacing:--spacing(5)]">
       <CardHeader>
         <CardTitle className="text-faint text-[11px] font-medium tracking-[0.1em] uppercase">
           {decision.auto
@@ -38,28 +44,22 @@ export function DecisionCard({ decision }: { decision: Decision }) {
                 ? "Decision recorded"
                 : "Proposed decision"}
         </CardTitle>
-        <CardAction>
-          <Badge variant={decision.auto ? "ledger" : "secondary"}>
-            {actionLabel(decision.action)}
-          </Badge>
-        </CardAction>
       </CardHeader>
 
-      <CardContent className="flex flex-col gap-3">
-        <div className="flex flex-col gap-1">
-          <p className="text-[14px] leading-relaxed font-medium">
+      <CardContent className="flex flex-col gap-4">
+        <div className="flex flex-col gap-2">
+          <p className="font-display text-[19px] leading-snug font-[450]">
             {decision.summary}
           </p>
-          {decision.amount_payable !== null ? (
-            <p className="text-muted-foreground font-mono text-[12px]">
-              pay {money(decision.amount_payable)}
-            </p>
-          ) : null}
-          {decision.attach_po !== null ? (
-            <p className="text-muted-foreground font-mono text-[12px]">
-              attach {decision.attach_po}
-            </p>
-          ) : null}
+          <FigureRow>
+            <Figure label="action" value={actionLabel(decision.action)} />
+            {decision.amount_payable !== null ? (
+              <Figure label="pay" value={money(decision.amount_payable)} />
+            ) : null}
+            {decision.attach_po !== null ? (
+              <Figure label="attach" value={decision.attach_po} />
+            ) : null}
+          </FigureRow>
         </div>
 
         {decision.auto && decision.cited_policy ? (
@@ -82,23 +82,19 @@ export function DecisionCard({ decision }: { decision: Decision }) {
           </p>
         ) : null}
 
-        <ConfidenceBar value={decision.confidence} />
-        <ChecklistLines checks={decision.checks} />
+        <div className="flex flex-col gap-3">
+          <ConfidenceBar value={decision.confidence} />
+          <ChecklistLines checks={decision.checks} />
+        </div>
 
         <Separator />
 
-        <p className="text-faint text-[12px] leading-relaxed">
-          {decision.rationale}
-          <span className="font-mono">
-            {" "}
-            ({decision.rationale_by === "code"
-              ? "written by code"
-              : decision.rationale_by === "human"
-                ? "written by hand"
-                : `written by ${decision.rationale_by}`}
-            )
-          </span>
-        </p>
+        <WhyThisDecision
+          key={decision.auto ? "auto" : "human"}
+          rationale={decision.rationale}
+          writtenBy={decision.rationale_by}
+          defaultOpen={!decision.auto}
+        />
       </CardContent>
     </Card>
   );

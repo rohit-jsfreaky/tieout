@@ -4,13 +4,11 @@ import { useState } from "react";
 
 import { FileMagnifyingGlass, Play } from "@phosphor-icons/react";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
   CardAction,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -32,7 +30,8 @@ import { AuthorityNote, aboveAuthority } from "../AuthorityNote";
 import { BrowserPanel } from "../BrowserPanel";
 import { DecideBar } from "../DecideBar";
 import { DecisionCard } from "../DecisionCard";
-import { FactCard } from "../FactCard";
+import { EvidenceList } from "../EvidenceList";
+import { Figure, FigureRow } from "../FigureRow";
 import { LiveTrail } from "../LiveTrail";
 import { RefusalCard } from "../RefusalCard";
 import { StatusBadge } from "../StatusBadge";
@@ -44,9 +43,11 @@ import { StatusBadge } from "../StatusBadge";
  * pack, the confidence comes off the decision, and the refusal's list of dead
  * ends is the engine's own lookup trail.
  *
- * The verdict sits above the evidence on purpose: the person reading it has to
- * decide, and then check. The evidence is right underneath, in the order it
- * landed, and it is never truncated.
+ * It reads top to bottom in the order it matters: which invoice, what Tieout
+ * decided, what it found — and down the right, filling its column, what its
+ * browser was looking at while it found it. The decision is the biggest thing
+ * on the view; the evidence under it is a trail of one-line facts, each opened
+ * when somebody wants to check that one.
  */
 export function ExceptionView({ desk }: { desk: Desk }) {
   const [pinned, setPinned] = useState<Fact | null>(null);
@@ -64,8 +65,8 @@ export function ExceptionView({ desk }: { desk: Desk }) {
   const settled = decision?.approved_by != null && !escalated;
   const blocked = aboveAuthority(decision, desk.approverSeat);
 
-  // The browser panel follows the run: the newest screenshot, unless a fact card
-  // was clicked, and only while that fact still belongs to the pack on screen.
+  // The browser panel follows the run: the newest screenshot, unless a fact was
+  // clicked, and only while that fact still belongs to the pack on screen.
   const shots = desk.facts.filter((fact) => fact.screenshot);
   const held = pinned && shots.some((fact) => fact.id === pinned.id) ? pinned : null;
   const shown = held ?? shots[shots.length - 1] ?? null;
@@ -101,14 +102,15 @@ export function ExceptionView({ desk }: { desk: Desk }) {
   }
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_25rem]">
-      <div className="flex min-w-0 flex-col gap-4">
-        <Card>
+    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_30rem]">
+      <div className="flex min-w-0 flex-col gap-5">
+        {/* Which invoice. Context rather than the point, so it is the small type
+            and the one status badge on the view. */}
+        <Card size="sm">
           <CardHeader>
-            <CardTitle className="font-display text-[19px] leading-tight font-[500]">
+            <CardTitle className="font-display text-[16px] leading-tight font-[500]">
               {exception.invoice_id} · {exception.vendor_name}
             </CardTitle>
-            <CardDescription>{exception.headline}</CardDescription>
             <CardAction>
               {!running && !worked ? (
                 <Button size="lg" disabled={busy} onClick={() => desk.work(exception.id)}>
@@ -125,8 +127,11 @@ export function ExceptionView({ desk }: { desk: Desk }) {
             </CardAction>
           </CardHeader>
 
-          <CardContent>
-            <dl className="text-muted-foreground flex flex-wrap gap-x-5 gap-y-1 font-mono text-[11px]">
+          <CardContent className="flex flex-col gap-1.5">
+            <p className="text-muted-foreground text-[13px] leading-snug">
+              {exception.headline}
+            </p>
+            <FigureRow>
               <Figure label="id" value={exception.id} />
               <Figure label="class" value={exceptionKindLabel(exception.kind)} />
               <Figure
@@ -140,12 +145,12 @@ export function ExceptionView({ desk }: { desk: Desk }) {
               {exception.po_id ? (
                 <Figure label="order" value={exception.po_id} />
               ) : null}
-            </dl>
+            </FigureRow>
           </CardContent>
         </Card>
 
         {/* Only while it is happening. Once the run is over every step of it is
-            in the facts below and in the decision's own checklist, and the pack
+            in the facts below and in the checklist on the decision, and the pack
             is what a person reads. */}
         {running && desk.live.length > 0 ? (
           <LiveTrail events={desk.live} />
@@ -182,22 +187,21 @@ export function ExceptionView({ desk }: { desk: Desk }) {
           />
         ) : null}
 
-        <Card>
+        <Card size="sm">
           <CardHeader>
-            <CardTitle>Evidence</CardTitle>
-            <CardDescription>
-              {desk.facts.length > 0
-                ? `Looked in ${desk.steps.length} places across ${
-                    (desk.detail?.pack?.sources_used ?? [])
-                      .map(sourceLabel)
-                      .join(", ") || "—"
-                  }.`
-                : "Every fact carries its source, its link, the time, and whether code or the model read it."}
-            </CardDescription>
+            <CardTitle className="text-faint text-[11px] font-medium tracking-[0.1em] uppercase">
+              Evidence
+            </CardTitle>
             <CardAction>
-              <Badge variant="secondary" className="font-mono">
-                {desk.facts.length || "—"}
-              </Badge>
+              <span className="text-faint font-mono text-[11px]">
+                {desk.facts.length > 0
+                  ? `${desk.facts.length} facts · ${desk.steps.length} places · ${
+                      (desk.detail?.pack?.sources_used ?? [])
+                        .map(sourceLabel)
+                        .join(", ") || "—"
+                    }`
+                  : "—"}
+              </span>
             </CardAction>
           </CardHeader>
 
@@ -223,22 +227,24 @@ export function ExceptionView({ desk }: { desk: Desk }) {
               </Empty>
             ) : null}
 
-            {desk.facts.map((fact) => (
-              <FactCard key={fact.id} fact={fact} onShowScreenshot={setPinned} />
-            ))}
+            {desk.facts.length > 0 ? (
+              <EvidenceList facts={desk.facts} onShowScreenshot={setPinned} />
+            ) : null}
 
             {desk.facts.length === 0 && running ? (
               <>
-                <Skeleton className="h-20 w-full" />
-                <Skeleton className="h-20 w-full" />
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-8 w-full" />
               </>
             ) : null}
           </CardContent>
         </Card>
       </div>
 
+      {/* The best thing on the screen, so it gets the whole column and stays in
+          view while the evidence scrolls past it. */}
       <div className="min-w-0 xl:sticky xl:top-0 xl:self-start">
-        <Card className="h-[28rem] py-0">
+        <Card className="overflow-hidden py-0">
           <BrowserPanel
             fact={shown}
             steps={desk.steps.filter((step) => step.source === "portal")}
@@ -246,15 +252,6 @@ export function ExceptionView({ desk }: { desk: Desk }) {
           />
         </Card>
       </div>
-    </div>
-  );
-}
-
-function Figure({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-baseline gap-1.5">
-      <dt className="text-faint">{label}</dt>
-      <dd>{value}</dd>
     </div>
   );
 }

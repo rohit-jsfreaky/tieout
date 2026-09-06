@@ -1,9 +1,7 @@
 import { HandPalm } from "@phosphor-icons/react";
 
-import { Badge } from "@/components/ui/badge";
 import {
   Card,
-  CardAction,
   CardContent,
   CardHeader,
   CardTitle,
@@ -15,12 +13,15 @@ import { clock } from "@/lib/format";
 import { ChecklistLines } from "./ChecklistLines";
 import { ConfidenceBar } from "./ConfidenceBar";
 import { SourceChip } from "./SourceChip";
+import { WhyThisDecision } from "./WhyThisDecision";
 
 /**
  * Refusing is an outcome, not an error.
  *
- * So it gets the same card as a decision, plus the thing that makes it
- * trustworthy: every place Tieout looked, including the ones that held nothing.
+ * So it gets the same card as a decision — same size, same order, no badge of
+ * its own, because the header at the top of the view has already said where
+ * this exception stands — plus the thing that makes it trustworthy: every place
+ * Tieout looked, including the ones that held nothing.
  */
 export function RefusalCard({
   decision,
@@ -30,24 +31,23 @@ export function RefusalCard({
   steps: LookupStep[];
 }) {
   return (
-    <Card>
+    <Card className="[--card-spacing:--spacing(5)]">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-[11px] font-medium tracking-[0.1em] uppercase">
+        <CardTitle className="text-faint flex items-center gap-2 text-[11px] font-medium tracking-[0.1em] uppercase">
           <HandPalm size={15} weight="bold" aria-hidden />
           Not confident — you decide
         </CardTitle>
-        <CardAction>
-          <Badge variant="outline">Refused</Badge>
-        </CardAction>
       </CardHeader>
 
-      <CardContent className="flex flex-col gap-3">
-        <p className="text-[14px] leading-relaxed font-medium">
+      <CardContent className="flex flex-col gap-4">
+        <p className="font-display text-[19px] leading-snug font-[450]">
           {decision.summary}
         </p>
 
-        <ConfidenceBar value={decision.confidence} tone="quiet" />
-        <ChecklistLines checks={decision.checks} />
+        <div className="flex flex-col gap-3">
+          <ConfidenceBar value={decision.confidence} tone="quiet" />
+          <ChecklistLines checks={decision.checks} />
+        </div>
 
         <Separator />
 
@@ -94,9 +94,11 @@ export function RefusalCard({
 
         <Separator />
 
-        <p className="text-faint text-[12px] leading-relaxed">
-          {decision.rationale}
-        </p>
+        <WhyThisDecision
+          rationale={decision.rationale}
+          writtenBy={decision.rationale_by}
+          defaultOpen
+        />
       </CardContent>
     </Card>
   );

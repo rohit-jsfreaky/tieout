@@ -2,7 +2,49 @@
 
 > Working memory for this folder. Read first, update before ending every session.
 
-## Current state — 2026-09-06 (S7, authority wired into the shadcn desk)
+## Current state — 2026-09-06 (S9, the readability pass on the Exception view)
+
+**Polish only — no new behaviour, no backend change.** The view was correct and unreadable at a
+glance: a thumbnail browser in an empty column, seven full-size fact cards, a column of unnamed
+numbers, a grey wall of rationale, and every block the same size. Six fixes, in the order Rohit
+listed them. `npm run typecheck`, `npm run lint` and `npm run build` are clean, and the whole
+thing was driven in a real Chromium at 1600×1000 against the live API — E1 (recorded), E2
+(auto-cleared), E5 (refused) and E3 (never worked) — with **no page errors and no console
+errors**.
+
+- **The live browser fills its column.** The right column went 25rem → 30rem, the panel lost its
+  inner padding so the chrome and the page go edge to edge inside the card, and the card is no
+  longer a fixed 28rem box: it is as tall as the screenshot it is showing
+  (`min-h-[15rem] max-h-[calc(100svh-16rem)]`), because a band of empty grey under a screenshot
+  reads as something that failed to load. It stays `xl:sticky xl:top-0`, so the portal page holds
+  still while the evidence scrolls. With nothing to show it is a Phosphor `Browser` mark on a
+  `surface` disc over the sentence explaining why a real browser is being driven at all.
+- **A fact is one line now.** `FactRow` (new) replaces `FactCard` (deleted): kind, the statement
+  clamped to one line, a camera mark if there is a screenshot, the time. Click it and the full
+  text, the locator, who read it and the screenshot unfold underneath. `EvidenceList` (new)
+  groups **consecutive** facts by source — "Inbox · 3 facts" over three lines instead of three
+  identical boxes. The grouping is only ever over neighbours: if the agent goes back to the ERP
+  after the portal that is a second visit and gets its own heading, because the order is part of
+  the evidence. Seven facts now cost about a third of the height they did.
+- **The weights are named.** `ChecklistLines` has a `check` / `weight` header, and `weight`
+  carries a shadcn `Tooltip`: "What each check is worth. The weights that passed add up to the
+  confidence." No bare `0.30` on the screen any more.
+- **`WhyThisDecision` (new)** puts the rationale on a toggle at 13px instead of 12px faint —
+  open on a decision somebody still has to make, closed on one that cleared itself. It is never
+  truncated and never paraphrased; it is just not shouted at a reader who did not ask.
+- **One badge per view.** `StatusBadge` in the exception header is the only badge on the page
+  now. `DecisionCard` and `RefusalCard` dropped theirs, and the action moved into the card as a
+  named figure — `action Short-pay · pay $1,757.50` — because "Short-pay" is what Tieout wants
+  to DO, not where the invoice stands.
+- **The spine, by size and spacing only, no new colour.** The decision's summary is Fraunces at
+  19px and its card carries a wider `--card-spacing`; the invoice strip above it dropped to 16px
+  `size="sm"`; the evidence heading is an 11px eyebrow like the decision's own. Blocks are
+  `gap-5` apart, rows inside them `gap-1.5`. E2 now reads in one screen: what broke, what was
+  decided, the rule and the name that decided it, the trail, and the portal page beside it.
+- `FigureRow` / `Figure` (new) is the `label value` pair the invoice strip already used, now
+  shared with the decision card. `hairline-top` joined `hairline` in `globals.css`.
+
+## Earlier — 2026-09-06 (S7, authority wired into the shadcn desk)
 
 **Approval authority is on the real screen now.** S6 built it on the old three-panel
 components; `master` had already replaced those with the shadcn rebuild, so the merge kept the
@@ -233,13 +275,23 @@ it is a `FileResponse` over `engine.sources.portal.screenshot_dir()`, and
 
 ## Next action
 
-Nothing in this folder. Phase 4 is done, hardened, rebuilt as a proper app and now carries the
-authority control on every view that needs it. The README predates the sidebar and the matrix,
-so its description of the screen is worth a second look. What is left is Rohit's: the video and
-the Discord post.
+Nothing in this folder. Phase 4 is done, hardened, rebuilt as a proper app, carries the authority
+control on every view that needs it, and has had its readability pass. The README predates the
+sidebar and the matrix, so its description of the screen is worth a second look. What is left is
+Rohit's: the video and the Discord post.
 
 ## Decisions made
 
+- **The source chip sits on the group heading, not on every fact row.** The brief asked for the
+  chip on the row AND for three vendor emails to read as "Inbox · 3 facts"; repeating the chip
+  three times under a heading that already says Inbox is the wall the brief was complaining
+  about. So the chip states the source once per visit and the rows under it carry the fact.
+- **The browser card is as tall as its screenshot, not as tall as the column.** A fixed-height
+  panel gave a big page a scrollbar and a small one 400px of empty grey. It has a floor
+  (15rem, for the empty state) and a ceiling (the viewport), and sits between them.
+- **`WhyThisDecision` is keyed on `decision.auto`.** `defaultOpen` is only an initial value, and
+  the same card stays mounted while an exception goes from proposed to recorded to cleared — the
+  key makes the default apply again when the kind of decision changes underneath it.
 - **Views are state, not routes.** `desk/CLAUDE.md` said one page and no second page, and there
   is a practical reason to keep it that way: `useDesk` stays mounted for the life of the screen,
   so an SSE run keeps streaming while somebody wanders off to read the rules it just learned.
@@ -298,6 +350,13 @@ toggle), verified twice with zero console errors. Record the demo from a normal 
 
 ## Session log
 
+- **2026-09-06 (S9, `readability`)** — the six-point polish pass on the Exception view: the live
+  browser filling its column and sticky, facts as one-line rows grouped by visit, the weight
+  column named with a tooltip, the rationale behind a "Why this decision" toggle, one status
+  badge per view, and a size-and-spacing spine. `FactRow`, `EvidenceList`, `WhyThisDecision` and
+  `FigureRow` are new; `FactCard` is gone. Checked in a real Chromium against the live API on
+  E1, E2, E5 and E3 by a throwaway Playwright script (since deleted, and it lived outside the
+  repo): no page errors, no console errors. Typecheck, lint and build clean.
 - **2026-09-06 (S7, `authority on the shadcn desk`)** — rewired approval authority onto the
   rebuilt desk: `Approver` in `useDesk`, `RoleSelect` off the matrix, the matrix table on
   Settings, `AuthorityNote` as a shadcn `Alert`, Approve disabled above the limit, the

@@ -182,6 +182,11 @@
   border-bottom: 1px solid rgb(0 0 0 / 0.06);
 }
 
+/* The same rule, drawn above — for a footer under a scrolling area. */
+@utility hairline-top {
+  border-top: 1px solid rgb(0 0 0 / 0.06);
+}
+
 /* Depth the Apple way: a lit top edge and a hairline drawn INSIDE the shape,
    so the curve stays crisp, with only a whisper of shadow underneath. */
 @utility surface {
