@@ -1,7 +1,14 @@
 import { Stamp } from "@phosphor-icons/react";
 
 import type { PolicyRow } from "@/lib/api-types";
-import { actionLabel, day, exceptionKindLabel, factKindLabel, money } from "@/lib/format";
+import {
+  actionLabel,
+  day,
+  exceptionKindLabel,
+  factKindLabel,
+  limitLabel,
+  money,
+} from "@/lib/format";
 
 /**
  * A rule Tieout learned from exactly one human decision.
@@ -10,6 +17,10 @@ import { actionLabel, day, exceptionKindLabel, factKindLabel, money } from "@/li
  * evaluates, the person who approved it, the day, the exception it came from and
  * the exceptions it has since cleared. That list is the self-improving loop, and
  * it is the reason a decision here can be audited a year from now.
+ *
+ * The ceiling next to the name is the sharp bit: the rule inherited that person's
+ * own approval limit and can never clear a payment above it, however well the
+ * rest of the condition matches.
  */
 export function PolicyCard({ row, fresh }: { row: PolicyRow; fresh: boolean }) {
   const { policy, cited_by } = row;
@@ -57,7 +68,8 @@ export function PolicyCard({ row, fresh }: { row: PolicyRow; fresh: boolean }) {
       <p className="text-ledger mt-3 flex items-start gap-1.5 text-[12px] leading-snug font-medium">
         <Stamp size={13} weight="fill" className="mt-[2px] shrink-0" aria-hidden />
         <span>
-          {policy.approved_by} · {day(policy.approved_at)}
+          {policy.approved_by} (limit {limitLabel(policy.authority_ceiling)}) ·{" "}
+          {day(policy.approved_at)}
         </span>
       </p>
 
@@ -110,6 +122,9 @@ function conditionLines({ policy }: PolicyRow): string[] {
   }
   if (when.max_exposure !== null) {
     lines.push(`exposure ≤ ${money(when.max_exposure)}`);
+  }
+  if (policy.authority_ceiling !== null) {
+    lines.push(`payment ≤ ${money(policy.authority_ceiling)}`);
   }
   if (when.requires.length > 0) {
     lines.push(

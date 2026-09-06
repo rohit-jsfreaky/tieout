@@ -51,6 +51,7 @@ const STATUS: Record<ExceptionStatus, string> = {
   refused: "Refused",
   auto_cleared: "Auto-cleared",
   resolved: "Resolved",
+  escalated: "Above their limit",
 };
 
 const ACTION: Record<DecisionAction, string> = {
@@ -59,6 +60,7 @@ const ACTION: Record<DecisionAction, string> = {
   attach_po: "Attach PO",
   reject: "Reject",
   refuse: "Refuse",
+  escalate: "Escalate",
 };
 
 const FACT_KIND: Record<FactKind, string> = {
@@ -82,6 +84,11 @@ export const statusLabel = (status: ExceptionStatus) => STATUS[status];
 export const actionLabel = (action: DecisionAction) => ACTION[action];
 export const factKindLabel = (kind: FactKind) => FACT_KIND[kind];
 export const sourceLabel = (source: Source) => SOURCE[source];
+
+/** `null` on the wire means no limit at all, which is not the same as a limit of zero. */
+export function limitLabel(limit: number | null): string {
+  return limit === null ? "no limit" : money(limit);
+}
 
 /** A Fact says who read it: `"code"`, or the id of the model that did. */
 export function readerLabel(extractedBy: string): string {

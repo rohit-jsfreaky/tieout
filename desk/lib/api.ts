@@ -2,13 +2,14 @@
  * The only place the desk talks to the API. No engine logic, no rules, no
  * thresholds — those live in `backend/src/tieout/engine/`.
  *
- * Nine routes and one stream. Every function here does exactly one HTTP call and
+ * Ten routes and one stream. Every function here does exactly one HTTP call and
  * hands back the shape `lib/api-types.ts` describes; nothing is reshaped, merged
  * or derived on the way through, so a number on the screen is a number the engine
  * published.
  */
 
 import type {
+  AuthorityResponse,
   DecideRequest,
   DecideResponse,
   DoneEvent,
@@ -101,6 +102,11 @@ export function decideException(
 /** GET /policies — every rule and version, with what has cited it. */
 export function getPolicies(): Promise<PoliciesResponse> {
   return request<PoliciesResponse>("GET", "/policies");
+}
+
+/** GET /authority — the delegation-of-authority matrix, exactly as the engine holds it. */
+export function getAuthority(): Promise<AuthorityResponse> {
+  return request<AuthorityResponse>("GET", "/authority");
 }
 
 /** GET /metrics — counted from the store on every request, never typed in. */

@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import type { DecidableAction } from "@/lib/api-types";
+import type { Approver } from "@/lib/useDesk";
 
 /**
  * The one human touch.
@@ -24,7 +25,7 @@ export function DecideBar({
   disabled,
   onDecide,
 }: {
-  approver: string;
+  approver: Approver;
   busy: boolean;
   disabled: boolean;
   onDecide: (action: DecidableAction, note: string) => void;
@@ -70,7 +71,7 @@ export function DecideBar({
           Edit
         </button>
         <span className="text-faint ml-auto text-[12px]">
-          as {approver.trim() || "— nobody —"}
+          as {approver.name.trim() || "— nobody —"}, {approver.role}
         </span>
       </div>
 

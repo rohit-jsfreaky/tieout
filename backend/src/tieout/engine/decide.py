@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
+from . import authority
 from . import model as llm
 from .models import (
     Check,
@@ -272,6 +273,7 @@ def propose(pack: EvidencePack, *, today: date | None = None) -> Decision:
     action = ACTION_FOR[case.kind]
     summary, payable, attach = action_detail(case, action)
     rationale, rationale_by = _rationale(case, pack, checks, action, summary, today)
+    signing = authority.amount_under_authority(case, action)
     return Decision(
         exception_id=case.id,
         action=action,
@@ -284,6 +286,10 @@ def propose(pack: EvidencePack, *, today: date | None = None) -> Decision:
         decided_at=datetime.now(),
         amount_payable=payable,
         attach_po=attach,
+        # What signing this off would actually authorise, and who is senior enough to do it.
+        # Published on every proposal so nobody has to work it out from the invoice total.
+        amount_for_authority=signing,
+        authority_needed=authority.role_needed_for(signing),
     )
 
 
@@ -300,10 +306,17 @@ def action_detail(
             None,
         )
     if action is DecisionAction.APPROVE:
+        # The tolerance sentence only belongs on an invoice that actually has a price
+        # variance. A person approving something else in full has their own reasons, and
+        # claiming a 0.00% increase was inside tolerance would be a fabricated one.
+        reason = (
+            f": the {case.price_variance_pct:.2f}% increase is inside the "
+            f"{PRICE_VARIANCE_TOLERANCE_PCT:g}% tolerance and the supplier gave notice."
+            if case.price_variance_pct > 0
+            else " as billed."
+        )
         return (
-            f"Approve {case.invoice_id} in full at {case.amount:,.2f} {case.currency}: the "
-            f"{case.price_variance_pct:.2f}% increase is inside the "
-            f"{PRICE_VARIANCE_TOLERANCE_PCT:g}% tolerance and the supplier gave notice.",
+            f"Approve {case.invoice_id} in full at {case.amount:,.2f} {case.currency}{reason}",
             case.amount,
             None,
         )
@@ -323,6 +336,10 @@ def _refusal(pack: EvidencePack, checks: list[Check], score: float) -> Decision:
     passed = sum(1 for check in checks if check.passed)
     failed = [check for check in checks if not check.passed]
     dead_ends = [step for step in pack.steps if not step.found]
+    # Nothing has been agreed, so the whole invoice is still on the table. Saying who would
+    # have to sign it is a second, independent reason this cannot end on one person's desk.
+    signing = authority.amount_under_authority(case, DecisionAction.REFUSE)
+    needed = authority.role_needed_for(signing)
 
     lines = [
         f"I am not confident about {case.invoice_id} from {case.vendor_name} "
@@ -334,6 +351,10 @@ def _refusal(pack: EvidencePack, checks: list[Check], score: float) -> Decision:
         lines.append(f"  - {step.action} — {mark}{f' ({step.note})' if step.note else ''}")
     if failed:
         lines.append("What is missing: " + "; ".join(check.name for check in failed) + ".")
+    lines.append(
+        f"Paying it would authorise {signing:,.2f} {case.currency}, which is "
+        f"{needed.value} authority ({authority.describe_limit(needed)})."
+    )
     lines.append("You decide.")
 
     return Decision(
@@ -350,6 +371,8 @@ def _refusal(pack: EvidencePack, checks: list[Check], score: float) -> Decision:
         checks=checks,
         auto=False,
         decided_at=datetime.now(),
+        amount_for_authority=signing,
+        authority_needed=needed,
     )
 
 

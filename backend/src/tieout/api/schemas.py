@@ -14,7 +14,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-from ..engine.models import Decision, EvidencePack, ExceptionCase, Policy
+from ..engine.models import Decision, EvidencePack, ExceptionCase, Policy, Role
 
 # What a person is allowed to do with an exception. ``approve`` means "do what Tieout
 # proposed"; the engine resolves it into the real action and records that on the trail.
@@ -57,6 +57,9 @@ class WorkAccepted(BaseModel):
 class DecideRequest(BaseModel):
     action: DecidableAction
     by: str = Field(min_length=1, description='who decided, e.g. "Chris, Controller"')
+    #: Their seat in the delegation-of-authority matrix. Left out, it is read off ``by`` when
+    #: that is written ``"Name, Role"`` — which is how the CLI has always spelled it.
+    role: Role | None = None
     note: str = ""
 
 
@@ -66,6 +69,20 @@ class DecideResponse(BaseModel):
     exception: ExceptionCase
     decision: Decision
     policy: Policy | None = None
+
+
+class AuthorityRow(BaseModel):
+    """One seat in the delegation-of-authority matrix. ``limit: null`` means no limit."""
+
+    role: Role
+    limit: float | None = None
+
+
+class AuthorityResponse(BaseModel):
+    """The matrix itself, so a client can label a role without inventing a number."""
+
+    matrix: list[AuthorityRow] = Field(default_factory=list)
+    note: str
 
 
 class PolicyRow(BaseModel):

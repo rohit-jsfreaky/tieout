@@ -2,7 +2,43 @@
 
 > Working memory for this folder. Read first, update before ending every session.
 
-## Current state — 2026-09-06 (after S5's hardening pass)
+## Current state — 2026-09-06 (S6, approval authority limits)
+
+**The approver is no longer just a name.** The control bar has a name AND a seat, and the seat
+carries a limit. `npm run typecheck`, `npm run lint` and `npm run build` are clean, and the
+whole thing was driven end to end against a live `python -m tieout.api` and a real Chromium
+with **no page errors**.
+
+- **`ControlBar` is name + role.** The role is a `<select>` populated from `GET /authority` —
+  the desk never lists a seat or a limit the engine did not publish. Next to it: "may approve
+  $10,000.00 · that limit goes on every rule this approval creates". Before the matrix lands
+  the limit shows `—`, not "no limit", because unknown and unlimited are not the same thing.
+- **`AuthorityNote` (new)** sits on both the decision card and the refusal card. It says what
+  signing this off would authorise and who may do it, and when the amount is above the seat's
+  limit it says so plainly and warns that approving will be blocked. Both numbers are off the
+  wire: `decision.amount_for_authority` is published by the engine on every decision, the
+  limit is the row for this seat in the matrix. The `>` here only decides what to *say* —
+  **the engine blocks server-side whatever this screen believes.**
+- **E5 now shows both reasons at once**, which was the point: "Not confident — you decide"
+  with 0 of 4 checks, and directly under it "$12,750.00 is above your $10,000.00 limit as
+  Controller. This needs the CFO."
+- **A blocked approval is a state on the card, not an error banner.** `DecisionCard` reads
+  "Above their authority — escalated" and shows the engine's own sentence. An escalation is
+  deliberately **not** treated as settled, so the decide bar stays open: change the seat to
+  CFO and approve, and the very same pack goes through. That is the demo.
+- **`PolicyCard` shows the ceiling** — "Chris, Controller (limit $10,000.00) · 6 Sept 2026" —
+  and "payment ≤ $10,000.00" sits in the rule's When list next to the tolerance and the
+  exposure, because it is enforced exactly like they are.
+- `api-types.ts` mirrors the new engine shapes: `Role`, `Decision.approved_role` /
+  `amount_for_authority` / `authority_needed`, `Policy.approved_role` / `authority_ceiling`,
+  the `escalate` action, the `escalated` status and the `escalated` event kind (added to
+  `EVENT_KINDS`, which is the list the stream subscribes by — miss it and the message is
+  silently dropped). `api.ts` gained `getAuthority()`; `format.ts` gained `limitLabel`, which
+  is the one place that knows `null` means no limit rather than a limit of zero.
+- `useDesk`'s `approver` is now `{ name, role }` and it exposes `authority` (the matrix, read
+  once) and `approverLimit` (a lookup in it, never a number this file made up).
+
+## Earlier — 2026-09-06 (after S5's hardening pass)
 
 - **The four beats were driven through this screen five consecutive times** against a live
   `python -m tieout.api` and a real Chromium, from a Reset each round. Identical counters every

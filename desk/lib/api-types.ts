@@ -35,14 +35,20 @@ export type DecisionAction =
   | "approve"
   | "attach_po"
   | "reject"
-  | "refuse";
+  | "refuse"
+  /** The approver is not allowed to sign this much. Nothing paid, nothing learned. */
+  | "escalate";
 
 export type ExceptionStatus =
   | "open"
   | "proposed"
   | "refused"
   | "auto_cleared"
-  | "resolved";
+  | "resolved"
+  | "escalated";
+
+/** A seat in the delegation-of-authority matrix. The limits come from `GET /authority`. */
+export type Role = "AP Clerk" | "Controller" | "CFO";
 
 /* ------------------------------------------------------------- the exception */
 
@@ -146,9 +152,15 @@ export interface Decision {
   auto: boolean;
   cited_policy: string | null;
   approved_by: string | null;
+  /** What the approver is allowed to sign — recorded next to the name, never inferred. */
+  approved_role: Role | null;
   decided_at: string;
   amount_payable: number | null;
   attach_po: string | null;
+  /** The money this decision authorises leaving the company. */
+  amount_for_authority: number | null;
+  /** The lowest seat in the matrix that may sign that amount off. */
+  authority_needed: Role | null;
   note: string;
 }
 
@@ -185,6 +197,12 @@ export interface Policy {
   rationale: string;
   drafted_by: string;
   approved_by: string;
+  approved_role: Role;
+  /**
+   * Segregation of duties: the rule may never clear more than the person who approved it
+   * could have cleared by hand. `null` only when a CFO approved it.
+   */
+  authority_ceiling: number | null;
   approved_at: string;
   learned_from: string;
   learned_from_invoice: string;
@@ -248,6 +266,8 @@ export type DecidableAction = "approve" | "reject" | "short_pay" | "attach_po";
 export interface DecideRequest {
   action: DecidableAction;
   by: string;
+  /** Left out, the engine reads it off `by` when that is written `"Name, Role"`. */
+  role?: Role;
   note?: string;
 }
 
@@ -256,6 +276,17 @@ export interface DecideResponse {
   exception: ExceptionCase;
   decision: Decision;
   policy: Policy | null;
+}
+
+/** GET /authority — one seat. `limit: null` means no limit. */
+export interface AuthorityRow {
+  role: Role;
+  limit: number | null;
+}
+
+export interface AuthorityResponse {
+  matrix: AuthorityRow[];
+  note: string;
 }
 
 /** GET /policies */
@@ -286,6 +317,7 @@ export type EventKind =
   | "proposed"
   | "refused"
   | "auto_cleared"
+  | "escalated"
   | "decided"
   | "policy_learned"
   | "policy_versioned"
@@ -300,6 +332,7 @@ export const EVENT_KINDS: EventKind[] = [
   "proposed",
   "refused",
   "auto_cleared",
+  "escalated",
   "decided",
   "policy_learned",
   "policy_versioned",

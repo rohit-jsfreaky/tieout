@@ -3,7 +3,7 @@
 tieout world      run the fake company (ERP, vendor portal, AP mailbox)
 tieout match      three-way match every open invoice, list what broke
 tieout work E1    investigate one exception, then clear it or escalate it
-tieout decide E1 approve --by "Chris, Controller"
+tieout decide E1 approve --by "Chris, Controller"    (or --by Chris --role controller)
 tieout policies   the rules Tieout has learned, every version
 tieout metrics    human touches, auto-clears, evidence, citations
 tieout demo       the four beats, end to end, from a fresh reset
@@ -21,8 +21,8 @@ from datetime import date
 
 import httpx
 
+from .engine import authority, load_env, match, metrics, policy, store
 from .engine import investigate as investigate_engine
-from .engine import load_env, match, metrics, policy, store
 from .engine.events import Event, EventKind
 from .engine.models import DecisionAction, EvidencePack, ExceptionCase, Metrics, Policy
 from .engine.sources.erp import ErpClient
@@ -92,6 +92,9 @@ def _render(event: Event) -> None:
     elif event.kind is EventKind.POLICY_VERSIONED:
         print()
         print(_wrap(event.message, indent="  ", first="  POLICY   "))
+    elif event.kind is EventKind.ESCALATED:
+        print()
+        print(_wrap(event.message, indent="  ", first="  ESCALATED  "))
     elif event.kind is EventKind.DECIDED:
         print()
         print(_wrap(event.message, indent="  ", first="  DECIDED  "))
@@ -108,6 +111,8 @@ def _print_decision(pack: EvidencePack) -> None:
     print()
     if decision.action is DecisionAction.REFUSE:
         headline = f"REFUSED — confidence {decision.confidence:.0%}"
+    elif decision.action is DecisionAction.ESCALATE:
+        headline = f"ESCALATED — needs the {decision.authority_needed}"
     elif decision.auto:
         headline = (
             f"AUTO-CLEARED — {decision.action.value}, citing {decision.cited_policy}, "
@@ -117,6 +122,16 @@ def _print_decision(pack: EvidencePack) -> None:
         headline = f"PROPOSED — {decision.action.value}, confidence {decision.confidence:.0%}"
     print(f"  {headline}")
     print(_wrap(decision.summary, indent="  ", first="  "))
+    if decision.amount_for_authority is not None and decision.authority_needed is not None:
+        print(
+            _wrap(
+                f"authorises {decision.amount_for_authority:,.2f} for payment — "
+                f"{decision.authority_needed} authority "
+                f"({authority.describe_limit(decision.authority_needed)})",
+                indent="  ",
+                first="  ",
+            )
+        )
     print()
     for line in decision.rationale.splitlines():
         print(_wrap(line, indent="    ", first="    ") if line.strip() else "")
@@ -156,6 +171,7 @@ def _print_policies(policies: list[Policy]) -> None:
         print(
             _wrap(
                 f"approved by {rule.approved_by} on {rule.approved_at:%d %B %Y}"
+                f" · may clear up to {authority.describe_limit(rule.approved_role)}"
                 f" · learned from {rule.learned_from} ({rule.learned_from_invoice})"
                 f" · drafted by {rule.drafted_by}",
                 indent="        ",
@@ -267,7 +283,9 @@ def cmd_work(exception_id: str, use_portal: bool = True) -> int:
     return 0
 
 
-def cmd_decide(exception_id: str, action: str, by: str, note: str = "") -> int:
+def cmd_decide(
+    exception_id: str, action: str, by: str, note: str = "", role: str | None = None
+) -> int:
     case = _find(exception_id)
     if case is None:
         print(f"  No exception called {exception_id}. Run `tieout match` first.")
@@ -277,12 +295,20 @@ def cmd_decide(exception_id: str, action: str, by: str, note: str = "") -> int:
             case,
             action=DecisionAction(action),
             by=by,
+            role=role,
             note=note,
             sink=_render,
             today=date.today(),
         )
     except investigate_engine.NotInvestigated as exc:
         print(f"  {exc}")
+        return 1
+    except authority.UnknownRole as exc:
+        print(f"  {exc}")
+        return 1
+    if decision.action is DecisionAction.ESCALATE:
+        # Not a failure of the agent: the control fired. Nothing paid, nothing learned.
+        print(_wrap(decision.rationale, indent="  ", first="  "))
         return 1
     if learned is not None:
         _print_policies([learned])
@@ -402,6 +428,11 @@ def _build_parser() -> argparse.ArgumentParser:
         help="approve = do what Tieout proposed",
     )
     decide.add_argument("--by", required=True, help='who decided, e.g. "Chris, Controller"')
+    decide.add_argument(
+        "--role",
+        default=None,
+        help="their seat in the delegation-of-authority matrix: AP Clerk, Controller or CFO",
+    )
     decide.add_argument("--note", default="", help="anything the approver wants on the record")
 
     commands.add_parser("policies", help="the rules Tieout has learned")
@@ -426,7 +457,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "work":
         return cmd_work(args.exception, use_portal=not args.no_portal)
     if args.command == "decide":
-        return cmd_decide(args.exception, args.action, args.by, args.note)
+        return cmd_decide(args.exception, args.action, args.by, args.note, args.role)
     if args.command == "policies":
         return cmd_policies()
     if args.command == "metrics":

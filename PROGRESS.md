@@ -3,7 +3,35 @@
 > Read this first, every session. Update it before ending the session.
 > Per-folder detail: `backend/PROGRESS.md`, `desk/PROGRESS.md`.
 
-## Current state — 2026-09-06 (S5, `harden + ship`)
+## Current state — 2026-09-06 (S6, `approval authority limits`)
+
+- **One feature added, and it is the last one: approval authority.** Before this, anyone could
+  approve anything. Now there is a **delegation-of-authority matrix** — AP Clerk 1,000 ·
+  Controller 10,000 · CFO no limit — in one named constant in `backend/src/tieout/engine/
+  authority.py`, with a comment saying a real deployment reads it from the company's own
+  approval policy.
+- **The approver is a name AND a role**, on the desk and on every decision and every rule.
+  "Chris, Controller" is now structured rather than a string somebody typed.
+- **Authority is measured on the money that actually leaves**: the short-paid amount on a
+  short-pay, the invoice total on an approve, nothing on a reject. A real accounting
+  distinction, written down in the code where a judge will look for it.
+- **Over the limit, the decision is blocked, not allowed.** Escalating is a first-class
+  outcome like refusing: nothing is paid, no rule is learned, and the trail records who tried.
+  The screen says *"12,750.00 USD is above a Controller's 10,000.00 limit. This needs the
+  CFO."* Switch the seat to CFO and the same pack goes through.
+- **The sharp one: a learned rule inherits the ceiling of whoever approved it.**
+  `SHORT-SHIP-01 v1` carries `authority_ceiling: 10,000` because Chris is a Controller, and
+  `policy.covers` enforces it — so that rule can never auto-clear a 50,000 invoice however
+  well everything else matches. A rejection only ever narrows the ceiling; a more senior
+  approval widens it into a new version, on the record.
+- **E5 now fails two independent tests**: Tieout is not confident about it, *and* paying it is
+  above a Controller's authority. Two separate reasons a person higher up is needed.
+- **`pytest backend/tests` 56 green** (was 46; `test_authority.py` is new), ruff clean, desk
+  typecheck/lint/build clean. Verified live against a real API and a real Chromium: the four
+  beats are unchanged, the block fires, and the CFO clears it.
+- **Still left for Rohit:** the demo video and the Discord post. Nothing else.
+
+## Earlier today — 2026-09-06 (S5, `harden + ship`)
 
 - **Phase 5 is DONE except the video and the Discord post.** No code left, no open bugs.
   - **`README.md` is written**, to the hackathon checklist. Every number in it came out of a
@@ -38,7 +66,7 @@
      clears only when the board and the pack have come back.
 - **Left for Rohit:** the demo video and the Discord post. Nothing else.
 
-## Earlier today — 2026-09-06
+## Earlier — 2026-09-06 (S3 and S4)
 
 - **Phase 4 (desk) is DONE. All four phases are done.** Its finish line passes: **the four
   beats can be driven from the screen with nothing else open** — no terminal, no curl, no
@@ -144,6 +172,11 @@ Open AO. Session S1 on the `world` module. Read `backend/PLAN.md`. Go.
 
 ## Session log
 
+- **2026-09-06 (S6, `approval authority`)** — the delegation-of-authority matrix, the approver's
+  role, the block above a limit, and the ceiling a learned rule inherits from whoever approved
+  it. One new engine file (`authority.py`), a tenth API route (`GET /authority`), a role select
+  on the desk. 56 tests green, ruff clean, desk typecheck/lint/build clean; the four beats and
+  the block driven end to end against a live API and a real Chromium.
 - **2026-09-06 (S5, `harden + ship`)** — five cold `tieout demo` runs, five passes through the
   desk, `work E3`/`work E4`, the no-key path, and the README. Fixed Rohit's two findings and
   two staleness bugs the repeated desk runs exposed. Added `open_not_worked` end to end.

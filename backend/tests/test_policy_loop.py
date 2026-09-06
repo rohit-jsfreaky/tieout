@@ -10,7 +10,7 @@ from __future__ import annotations
 from conftest import chromium_or_skip
 from tieout.engine import investigate as investigate_engine
 from tieout.engine import metrics, policy, store
-from tieout.engine.models import DecisionAction, ExceptionKind
+from tieout.engine.models import DecisionAction, ExceptionKind, Role
 
 APPROVER = "Chris, Controller"
 
@@ -36,6 +36,9 @@ def test_approve_once_and_the_next_one_clears_itself(sources, cases) -> None:
     assert learned.id == "SHORT-SHIP-01"
     assert learned.version == 1
     assert learned.approved_by == APPROVER
+    assert learned.approved_role is Role.CONTROLLER
+    # And it inherits his ceiling: the rule may never clear more than Chris could by hand.
+    assert learned.authority_ceiling == 10_000.00
     assert learned.approved_at.date() is not None
     assert learned.learned_from == "E1"
     assert learned.kind is ExceptionKind.SHORT_SHIP
@@ -88,18 +91,21 @@ def test_a_contradicting_decision_versions_the_rule_and_keeps_the_old_one(source
     second = investigate_engine.work(cases["E2"], sources)
     assert second.proposal is not None and second.proposal.auto is True
 
-    # A controller looks at the auto-cleared one and disagrees.
+    # Somebody senior looks at the auto-cleared one and disagrees.
     _, narrowed = investigate_engine.apply_human_decision(
         cases["E2"],
         action=DecisionAction.REJECT,
-        by="Dana, Head of Finance",
+        by="Dana, CFO",
         note="we are not short-paying this supplier again this quarter",
     )
     assert narrowed is not None
     assert narrowed.id == "SHORT-SHIP-01"
     assert narrowed.version == 2
     assert narrowed.supersedes_version == 1
-    assert narrowed.approved_by == "Dana, Head of Finance"
+    assert narrowed.approved_by == "Dana, CFO"
+    # A rejection only ever narrows: the CFO's own unlimited authority does not raise what
+    # the rule may clear by itself, which stays at the Controller's 10,000.
+    assert narrowed.authority_ceiling == 10_000.00
 
     versions = {rule.version: rule for rule in store.list_policies()}
     assert set(versions) == {1, 2}

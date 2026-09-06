@@ -2,7 +2,9 @@ import { HandPalm } from "@phosphor-icons/react";
 
 import type { Decision, LookupStep } from "@/lib/api-types";
 import { clock } from "@/lib/format";
+import type { Approver } from "@/lib/useDesk";
 
+import { AuthorityNote } from "./AuthorityNote";
 import { ChecklistLines } from "./ChecklistLines";
 import { ConfidenceBar } from "./ConfidenceBar";
 import { SourceChip } from "./SourceChip";
@@ -16,9 +18,13 @@ import { SourceChip } from "./SourceChip";
 export function RefusalCard({
   decision,
   steps,
+  approver,
+  approverLimit,
 }: {
   decision: Decision;
   steps: LookupStep[];
+  approver: Approver;
+  approverLimit: number | null;
 }) {
   return (
     <section className="surface rounded-lg bg-white p-4">
@@ -32,6 +38,14 @@ export function RefusalCard({
       <p className="mt-2 text-[14px] leading-relaxed font-medium">
         {decision.summary}
       </p>
+
+      {/* Two independent reasons this cannot end here: Tieout is not confident,
+          AND paying it may be above the authority of whoever is at the desk. */}
+      <AuthorityNote
+        decision={decision}
+        approver={approver}
+        approverLimit={approverLimit}
+      />
 
       <div className="mt-4">
         <ConfidenceBar value={decision.confidence} tone="quiet" />

@@ -150,6 +150,8 @@ def test_one_decision_teaches_the_rule_that_clears_the_next_one(client: TestClie
     assert decided.status_code == 200
     learned = decided.json()["policy"]
     assert learned["approved_by"] == "Chris, Controller"
+    assert learned["approved_role"] == "Controller"
+    assert learned["authority_ceiling"] == 10000.0, "the rule inherits his limit"
     assert learned["learned_from"] == "E1"
     assert learned["version"] == 1
     assert decided.json()["exception"]["status"] == "resolved"
@@ -194,6 +196,45 @@ def test_the_refusal_is_a_first_class_answer_over_http(client: TestClient) -> No
         "a refusal has to show the places that held nothing"
     )
     assert client.get("/policies").json()["count"] == 0, "a refusal never becomes a rule"
+
+
+def test_the_authority_matrix_is_published_not_reinvented(client: TestClient) -> None:
+    """The desk needs the seats and the limits, and there is exactly one place they live."""
+    body = client.get("/authority").json()
+
+    assert [row["role"] for row in body["matrix"]] == ["AP Clerk", "Controller", "CFO"]
+    assert [row["limit"] for row in body["matrix"]] == [1000.0, 10000.0, None]
+
+
+def test_an_approval_above_the_approvers_limit_is_blocked_over_http(client: TestClient) -> None:
+    """E5 is 12,750. A Controller may not sign it, and the API says so in the same words."""
+    chromium_or_skip()
+    client.get("/queue")
+    _work_and_watch(client, "E5")
+
+    blocked = client.post(
+        "/exceptions/E5/decide", json={"action": "approve", "by": "Chris", "role": "Controller"}
+    )
+    assert blocked.status_code == 200, "escalating is an outcome, not an error"
+    body = blocked.json()
+    assert body["decision"]["action"] == "escalate"
+    assert body["decision"]["authority_needed"] == "CFO"
+    assert body["decision"]["amount_for_authority"] == 12750.0
+    assert "above a Controller's 10,000.00 limit" in body["decision"]["summary"]
+    assert body["policy"] is None, "a blocked approval never becomes a rule"
+    assert body["exception"]["status"] == "escalated"
+    assert client.get("/policies").json()["count"] == 0
+
+    # The CFO above them signs off the very same pack.
+    allowed = client.post("/exceptions/E5/decide", json={"action": "approve", "by": "Dana, CFO"})
+    assert allowed.status_code == 200
+    assert allowed.json()["decision"]["action"] == "approve"
+    assert allowed.json()["exception"]["status"] == "resolved"
+
+    # And a role nobody has heard of is refused rather than guessed at.
+    unknown = client.post("/exceptions/E5/decide", json={"action": "approve", "by": "Sam"})
+    assert unknown.status_code == 400
+    assert "does not know what Sam is allowed to approve" in unknown.json()["detail"]
 
 
 def test_the_api_refuses_to_run_two_investigations_at_once(client: TestClient) -> None:

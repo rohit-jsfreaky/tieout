@@ -2,7 +2,115 @@
 
 > Working memory for this folder. Read first, update before ending every session.
 
-## Current state — 2026-09-06 (AO session S5, harden + ship)
+## Current state — 2026-09-06 (AO session S6, approval authority limits)
+
+**One feature was added and nothing else: approval authority.** Before this, anyone could
+approve anything — which no real AP department does. `pytest backend/tests -q` is now
+**56 green**, `ruff check` and `ruff format` clean.
+
+### `engine/authority.py` — the new file, and the only one that answers "may this person sign?"
+
+- **`AUTHORITY_LIMITS` is the delegation-of-authority matrix**, as a named constant:
+  AP Clerk 1,000 · Controller 10,000 · CFO no limit (`None`). The comment says what it is and
+  that a real deployment reads it from the company's own approval policy rather than from
+  this file. `LADDER` orders the three seats; `role_needed_for(amount)` walks it.
+- **`amount_under_authority(case, action)` is the rule a judge will probe.** Authority is
+  measured on the amount being approved **for payment**: the short-paid amount on a
+  `short_pay` (holding 92.50 back from a 1,850.00 invoice authorises **1,757.50**, not
+  1,850.00), the invoice total on an `approve` or an `attach_po`, and **nothing** on a
+  `reject` — saying no needs no spending authority. Written down in the docstring.
+- **`approver_for(by, role)`** builds an `Approver` (name + role) from `"Chris, Controller"`
+  or from a name and a role given separately. It never infers and never defaults: an unknown
+  role raises `UnknownRole` rather than guessing. `ARTICLE` is a table, not a rule, so the
+  sentence reads "an AP Clerk's" and "a Controller's".
+
+### The approver has a role, and every decision records it
+
+- `models.py` gained `Role` (AP Clerk / Controller / CFO) and `Approver` (name + role, with a
+  computed `label` — `"Chris, Controller"`, which is still what `approved_by` holds).
+- `Decision` gained `approved_role`, `amount_for_authority` and `authority_needed`. Every
+  proposal, auto-clear, refusal and human decision now publishes what signing it off would
+  authorise and the lowest seat that may do it — so no client has to work it out.
+- `Policy` gained `approved_role` and **`authority_ceiling`**.
+
+### Escalation is a first-class outcome, like refusal
+
+- `DecisionAction.ESCALATE`, `ExceptionStatus.ESCALATED`, `EventKind.ESCALATED`.
+- `investigate.apply_human_decision` checks the matrix **before** recording anything. Over the
+  limit and the decision is **blocked**: nothing is paid, no rule is learned, the exception
+  goes to `escalated`, and the trail carries the attempt with the person's name on it — so a
+  month later it is clear the control fired rather than that somebody forgot. The sentence is
+  the engine's, in one place, and it is the same words in the terminal, on the wire and on
+  the screen: *"12,750.00 USD is above a Controller's 10,000.00 limit. This needs the CFO."*
+- `metrics.awaiting_human` now counts `escalated` too. No new counter was added.
+
+### THE SHARP ONE — a rule inherits the ceiling of whoever approved it
+
+`policy.learn` stamps the approver's own limit onto the rule, and **`policy.covers` enforces
+it**: the rule may not authorise a payment the person who approved it could not have
+authorised by hand. Chris, a Controller, cannot create a rule that later clears a 50,000
+invoice at three in the morning. `policy.apply` re-checks through `covers` and its rationale
+says so. Two supporting decisions:
+
+- **A rejection only ever narrows.** `_narrow_after_rejection` takes the *tighter* of the
+  rule's ceiling and the rejector's, so a CFO saying no cannot accidentally raise what the
+  rule may clear. `test_policy_loop` asserts v2 stays at 10,000 after Dana, CFO rejects.
+- **A more senior approval widens the ceiling into a new version.** `_contradicts` now
+  compares ceilings, so a CFO approving the same shape produces v2 with their name on it and
+  keeps v1 on the record. That is how every other change to a rule already worked.
+
+### The wire and the terminal
+
+- **A tenth route: `GET /authority`** — the matrix itself, read straight off the constant.
+  The desk needs the seats to offer them and the limits to say "above a Controller's 10,000"
+  without inventing the number. No logic, like the other nine.
+- `POST /decide` takes an optional `role`; left out it is read off `by` when that is written
+  `"Name, Role"`, so every existing call still works. An unknown role is a 400. **A blocked
+  approval is a 200** carrying the escalation decision and `policy: null` — it is an outcome,
+  not an error.
+- `tieout decide` gained `--role` (`--by Chris --role controller` or the old
+  `--by "Chris, Controller"`). `tieout policies` prints "may clear up to 10,000.00".
+  `tieout demo` is unchanged: Chris short-pays 1,757.50, well inside a Controller's limit.
+
+### Tests — 56 green (was 46)
+
+`test_authority.py` is new, eight tests: the matrix and the ladder; the approver parser
+including the three ways to get it wrong; **which amount authority is measured on**; a
+Controller blocked at 12,750 on E5; a CFO allowed; an AP Clerk blocked at 1,757.50 on E1 and
+the Controller above them allowed on the same pack; **a Controller's rule refusing to clear
+an 11,988.00 payment even though the shortfall, the exposure, the supplier, the class and
+every required fact match** — and the same rule with the ceiling lifted covering it, which is
+what proves the ceiling is the only thing stopping it; and a CFO's approval widening the
+ceiling into v2. `test_api.py` gained the matrix route and the block over HTTP.
+
+### Verified live, not only in tests
+
+Against a real `python -m tieout.api` with a real Chromium on the real portal:
+
+- The four beats are unchanged — E1 proposes short_pay at 100% authorising 1,757.50,
+  Chris approves, `SHORT-SHIP-01 v1` is born with `authority_ceiling: 10000.0`, E2
+  auto-clears citing it, E5 refuses.
+- E5's refusal now carries **both** reasons: not confident, *and* "Paying it would authorise
+  12,750.00 USD, which is CFO authority."
+- Chris, Controller approving E5 → `escalate`, status `escalated`, `policy: null`, policies
+  still 1. Dana, CFO on the same pack → `approve`, `resolved`.
+- `tieout decide E3 approve --by Sam --role "ap clerk"` prints the block; the same command as
+  `"Chris, Controller"` learns `PRICE-VAR-01 v1` with a 10,000 ceiling.
+
+### One small wording fix on the path this feature put on camera
+
+`decide.action_detail` used to write "the 0.00% increase is inside the 5% tolerance" whenever
+a person approved something in full, including an invoice with no price variance at all —
+which is exactly what a CFO does after a block. It now only claims the tolerance when there
+is a variance to claim it about, and says "as billed" otherwise. E3's wording is unchanged.
+
+### Note for anyone with an old store
+
+`Policy` gained two required-ish fields, and there is no migration: an `engine.db` written
+before today will not validate. `tieout reset` (or `POST /reset`) fixes it, and the demo
+always starts from one.
+
+## Earlier — 2026-09-06 (AO session S5, harden + ship)
 
 - **Nothing is being built here any more.** S5 hardened what exists and wrote the root
   `README.md`. `pytest backend/tests -q` is **46 green**, `ruff check` and `ruff format` clean.

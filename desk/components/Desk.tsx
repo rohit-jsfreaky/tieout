@@ -65,6 +65,7 @@ export function Desk() {
             running={running}
             busy={busy}
             approver={desk.approver}
+            approverLimit={desk.approverLimit}
             onWork={() => desk.selectedId && desk.work(desk.selectedId)}
             onDecide={desk.decide}
             onShowScreenshot={setPinned}
@@ -86,6 +87,7 @@ export function Desk() {
           <ControlBar
             approver={desk.approver}
             setApprover={desk.setApprover}
+            authority={desk.authority}
             nextId={desk.nextId}
             pending={desk.pending}
             onWorkNext={() => desk.nextId && desk.work(desk.nextId)}

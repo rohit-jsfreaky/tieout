@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type {
+  AuthorityRow,
   DecidableAction,
   EngineEvent,
   ExceptionDetail,
@@ -20,10 +21,12 @@ import type {
   Metrics,
   PolicyRow,
   QueueRow,
+  Role,
 } from "./api-types";
 import {
   ApiError,
   decideException,
+  getAuthority,
   getException,
   getMetrics,
   getPolicies,
@@ -41,6 +44,12 @@ interface LiveRun {
 
 export type Pending = "work" | "decide" | "reset" | null;
 
+/** Who is signing: a name AND a seat in the delegation-of-authority matrix. */
+export interface Approver {
+  name: string;
+  role: Role;
+}
+
 export interface Desk {
   queue: QueueRow[];
   selectedId: string | null;
@@ -53,8 +62,12 @@ export interface Desk {
   runningId: string | null;
   policies: PolicyRow[];
   metrics: Metrics | null;
-  approver: string;
-  setApprover: (name: string) => void;
+  approver: Approver;
+  setApprover: (approver: Approver) => void;
+  /** The matrix, straight off `GET /authority`. Never a number this file made up. */
+  authority: AuthorityRow[];
+  /** The current approver's own limit, looked up in that matrix. `null` = no limit. */
+  approverLimit: number | null;
   /** The rule the last approval created, so its card can announce itself. */
   learned: string | null;
   pending: Pending;
@@ -68,7 +81,7 @@ export interface Desk {
   reset: () => void;
 }
 
-const DEFAULT_APPROVER = "Chris, Controller";
+const DEFAULT_APPROVER: Approver = { name: "Chris", role: "Controller" };
 
 function say(failure: unknown): string {
   if (failure instanceof ApiError) return failure.message;
@@ -83,7 +96,8 @@ export function useDesk(): Desk {
   const [runningId, setRunningId] = useState<string | null>(null);
   const [policies, setPolicies] = useState<PolicyRow[]>([]);
   const [metrics, setMetrics] = useState<Metrics | null>(null);
-  const [approver, setApprover] = useState(DEFAULT_APPROVER);
+  const [approver, setApprover] = useState<Approver>(DEFAULT_APPROVER);
+  const [authority, setAuthority] = useState<AuthorityRow[]>([]);
   const [learned, setLearned] = useState<string | null>(null);
   const [pending, setPending] = useState<Pending>(null);
   const [loading, setLoading] = useState(true);
@@ -131,6 +145,10 @@ export function useDesk(): Desk {
     let alive = true;
     void (async () => {
       try {
+        // The matrix is a constant in the engine, so it is read once and never again.
+        getAuthority()
+          .then((matrix) => alive && setAuthority(matrix.matrix))
+          .catch(() => undefined);
         const rows = await loadBoard();
         if (!alive) return;
         const first = rows[0]?.exception.id ?? null;
@@ -221,7 +239,7 @@ export function useDesk(): Desk {
   const decide = useCallback(
     (action: DecidableAction, note: string) => {
       const id = selectedRef.current;
-      const by = approver.trim();
+      const by = approver.name.trim();
       if (!id || pending) return;
       if (!by) {
         setError(
@@ -234,7 +252,12 @@ export function useDesk(): Desk {
 
       void (async () => {
         try {
-          const answer = await decideException(id, { action, by, note });
+          const answer = await decideException(id, {
+            action,
+            by,
+            role: approver.role,
+            note,
+          });
           setLearned(answer.policy?.ref ?? null);
           setRun(null);
           await Promise.all([loadBoard(), loadDetail(id)]);
@@ -318,6 +341,13 @@ export function useDesk(): Desk {
     [queue],
   );
 
+  // A lookup in the fetched matrix, not a rule: the engine still decides, and it blocks
+  // server-side whatever this screen believes.
+  const approverLimit = useMemo(
+    () => authority.find((row) => row.role === approver.role)?.limit ?? null,
+    [authority, approver.role],
+  );
+
   const dismissError = useCallback(() => setError(null), []);
 
   return {
@@ -332,6 +362,8 @@ export function useDesk(): Desk {
     metrics,
     approver,
     setApprover,
+    authority,
+    approverLimit,
     learned,
     pending,
     loading,

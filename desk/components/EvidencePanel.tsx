@@ -12,6 +12,7 @@ import type {
   LookupStep,
 } from "@/lib/api-types";
 import { exceptionKindLabel, money, sourceLabel } from "@/lib/format";
+import type { Approver } from "@/lib/useDesk";
 
 import { DecideBar } from "./DecideBar";
 import { DecisionCard } from "./DecisionCard";
@@ -36,6 +37,7 @@ export function EvidencePanel({
   running,
   busy,
   approver,
+  approverLimit,
   onWork,
   onDecide,
   onShowScreenshot,
@@ -46,7 +48,8 @@ export function EvidencePanel({
   live: EngineEvent[];
   running: boolean;
   busy: boolean;
-  approver: string;
+  approver: Approver;
+  approverLimit: number | null;
   onWork: () => void;
   onDecide: (action: DecidableAction, note: string) => void;
   onShowScreenshot: (fact: Fact) => void;
@@ -55,7 +58,10 @@ export function EvidencePanel({
   const decision = detail?.decision ?? lastDecision(live);
   const refused = decision?.action === "refuse";
   const worked = facts.length > 0 || decision !== null;
-  const settled = decision?.approved_by != null;
+  // An escalation is NOT settled: nothing was paid, and the pack is still waiting
+  // for somebody senior enough, so the decide bar stays open for them.
+  const settled =
+    decision?.approved_by != null && decision.action !== "escalate";
 
   // The pack follows itself: the newest fact while evidence is landing, then the
   // verdict, from its first line, the moment there is one to read.
@@ -161,9 +167,18 @@ export function EvidencePanel({
           {decision ? (
             <div ref={verdict} className="scroll-mt-2 pt-2">
               {refused ? (
-                <RefusalCard decision={decision} steps={steps} />
+                <RefusalCard
+                  decision={decision}
+                  steps={steps}
+                  approver={approver}
+                  approverLimit={approverLimit}
+                />
               ) : (
-                <DecisionCard decision={decision} />
+                <DecisionCard
+                  decision={decision}
+                  approver={approver}
+                  approverLimit={approverLimit}
+                />
               )}
             </div>
           ) : null}
