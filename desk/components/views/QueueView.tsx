@@ -22,13 +22,15 @@ import type { Desk } from "@/lib/useDesk";
 
 import { CounterStrip } from "../CounterStrip";
 import { GuideCard } from "../GuideCard";
+import { MoneyStrip } from "../MoneyStrip";
 import { QueueTable } from "../QueueTable";
 
 /**
  * Where a judge lands.
  *
- * The counters, then the exceptions. Nothing else is on this view, because the
- * only question it has to answer is "what broke, and what do I click".
+ * The money, then the counts, then the exceptions. Nothing else is on this view,
+ * because the only question it has to answer is "what broke, what does it cost,
+ * and what do I click".
  */
 export function QueueView({
   desk,
@@ -52,7 +54,10 @@ export function QueueView({
         />
       ) : null}
 
-      <CounterStrip metrics={desk.metrics} loading={desk.loading} />
+      <div className="flex flex-col gap-2">
+        <MoneyStrip queue={desk.queue} loading={desk.loading} />
+        <CounterStrip metrics={desk.metrics} loading={desk.loading} />
+      </div>
 
       <Card>
         <CardHeader>

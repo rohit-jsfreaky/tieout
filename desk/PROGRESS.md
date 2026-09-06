@@ -2,6 +2,38 @@
 
 > Working memory for this folder. Read first, update before ending every session.
 
+## Current state — 2026-09-06 (S10, the Policies page and the money on the Queue)
+
+**Polish only — no new behaviour, no backend change, no new route.** Two views, both driven in a
+real Chromium at 1600×950 and 900×950 against the live API on :8700, with **no page errors**.
+`npm run typecheck`, `npm run lint` and `npm run build` are clean.
+
+- **Policies was one card in an empty page. It is a page now.** Four figures across the top
+  (rules in force, times cited, human touches avoided, and the money those rules cleared), then
+  **`PolicyTable` (new)** — one line per rule and per version: ref, version, name, status, the
+  approver with the ceiling their seat imposes, what it was learned from, times cited and the
+  money it has cleared. Clicking a line unfolds the full **WHEN / THEN** condition and the
+  rationale. With exactly one rule in the book that line opens itself, because a policy book with
+  one line in it should show what that line says. `PolicyCard` (three of them in a grid, mostly
+  air) is deleted.
+- **The delegation-of-authority matrix is on that page**, from `GET /authority`, with a third
+  column counting the rules signed at each seat — so the ceiling on a rule above can be traced to
+  the seat that set it. Next to it, **`PolicyLoopCard` (new)**: the four steps `engine/policy.py`
+  actually runs, in order. The two fill the bottom of the page side by side.
+- **The Empty state is kept** — no rule learned yet still says the first one is born the moment a
+  human approves something.
+- **The queue tiles counted actions. This is a finance product, so money leads now.**
+  **`MoneyStrip` (new)** sits above the counters: billed, held back, auto-approved for payment,
+  waiting on a person. Real numbers off a real run: **$25,040.00 billed · $356.50 held ·
+  $696.00 auto-approved · $12,750.00 waiting**. The counts are unchanged, one size smaller,
+  underneath.
+- **`lib/totals.ts` (new) is the only file on the desk that adds two numbers together.** Every
+  term is a field the API published — the invoice total, the engine's `exposure`, a decision's
+  `amount_payable`. "Waiting on a person" uses the same three statuses `engine/metrics.py`
+  counts for `awaiting_human`, so the desk and the engine cannot drift.
+- **`Figure` (new) replaces `Counter`**: one tile for money and counts both, with a hint line and
+  `tabular-nums`, so the two strips on the queue read as one system.
+
 ## Current state — 2026-09-06 (S9, the readability pass on the Exception view)
 
 **Polish only — no new behaviour, no backend change.** The view was correct and unreadable at a

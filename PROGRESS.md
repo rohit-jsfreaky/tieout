@@ -3,7 +3,28 @@
 > Read this first, every session. Update it before ending the session.
 > Per-folder detail: `backend/PROGRESS.md`, `desk/PROGRESS.md`.
 
-## Current state — 2026-09-06 (S7, `authority on the shadcn desk`)
+## Current state — 2026-09-06 (S10, `the policies page and the money on the queue`)
+
+- **Two views polished for the recording. No backend change, no new feature, no new route.**
+- **Policies was a single card floating in an empty page.** It is now a full-width page like
+  Audit: four figures across the top, a **table of every rule and every version** — ref, version,
+  name, status, the approver and the ceiling their seat imposes, what it was learned from, times
+  cited, and the money that rule has cleared — where clicking a line unfolds the full WHEN / THEN
+  condition and the rationale. The **delegation-of-authority matrix** is on the same page, read
+  from `GET /authority` and never typed into the frontend, with a column counting the rules
+  signed at each seat. Beside it, the four steps `engine/policy.py` actually runs. The empty
+  state is kept.
+- **The queue tiles counted actions; now money leads.** Billed, held back, auto-approved for
+  payment, waiting on a person — above the counts, which are unchanged. Real figures from the
+  live run: **$25,040.00 billed · $356.50 held · $696.00 auto-approved · $12,750.00 waiting.**
+- **Nothing on either strip is invented.** `desk/lib/totals.ts` is the only file on the desk that
+  adds two numbers together, and every term in it is a field the API published. "Waiting on a
+  person" uses the same three statuses `engine/metrics.py` counts for `awaiting_human`.
+- **Verified** in a real Chromium at 1600×950 and 900×950 against the live API, no page errors;
+  desk typecheck, lint and build clean. `backend/` untouched.
+- **Still left for Rohit:** the demo video and the Discord post. Nothing else.
+
+## Earlier today — 2026-09-06 (S7, `authority on the shadcn desk`)
 
 - **Approval authority is on the real screen now.** S6 built the desk half of it on the old
   three-panel components, which `master` had already replaced with the shadcn rebuild — so the
@@ -195,6 +216,12 @@ Open AO. Session S1 on the `world` module. Read `backend/PLAN.md`. Go.
 - Team name for the Discord post: "Tieout" (solo).
 
 ## Session log
+
+- **2026-09-06 (S10, `desk polish`)** — the Policies view rebuilt as a full-width page (a table
+  of rules with an expandable WHEN / THEN, the authority matrix from `GET /authority`, the empty
+  state kept) and a money strip added above the queue counters. Five new desk files, two deleted
+  (`Counter`, `PolicyCard`), no backend change. Typecheck, lint and build clean; both views
+  driven in a real Chromium against the live API with no page errors.
 
 - **2026-09-06 (S8, `desk`)** — the desk rebuilt as a real app: `shadcn@latest init` on the
   existing Next 16 / Tailwind v4 project (registry `@shadcn`, Base UI), a sidebar and five
