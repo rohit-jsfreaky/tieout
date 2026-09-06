@@ -3,6 +3,61 @@
 Every entry has a **date** and a **source** (the page actually opened). Missing fact → open the
 real docs with Playwright MCP, add it here. Never WebSearch. Never build on a guess.
 
+## ⚠️⚠️ JUDGE CRITERIA + SUBMISSION CHANGE — read before anything else
+### Rayed | Maximor, #syndicate-announcements, 2026-09-06 00:10, verbatim
+
+**SUBMISSION PLATFORM CHANGED. It is DEVPOST, not just the Discord channel.**
+> "Devpost is the official submission platform for Syndicate. **All final projects must be
+> submitted there before the deadline to be considered for judging.**"
+> https://syndicate-by-maximor.devpost.com/
+Register NOW. The Notion page only mentioned `#syndicate-project-showcase`. Missing this is a
+straight disqualification.
+
+**The demo video is 3 MINUTES**, not 2-5 as we assumed from the Notion.
+
+### [Track 2] Autonomous Office of the CFO — what they score
+
+> "we're really looking for some specific workflow in the Office of the CFO domain, but applied
+> with modern agentic tech. It's not like Track 1 where the domain doesn't matter! We're really
+> looking at **if your solution for some finance problem would truly work in a realistic
+> setting**. This would require a genuine, deep understanding of specific Office of the CFO
+> workflows... **grounding it with real findings in this domain** makes these automations be so
+> much more realistically effective."
+
+The four questions they will ask, verbatim:
+1. "Is the problem that you're solving a **genuine pain-point** for people that work in the
+   Office of the CFO?"
+2. "Is the **human judgement side** of the finance automation truly **intuitive**?"
+3. "How **deep and well thought through** is the automation in context of the specific Office
+   of the CFO related workflow?"
+4. "How well **grounded** is this solution to be genuinely **used by accountants in the real
+   world**?"
+
+### His tips, verbatim — two of these change our plan
+
+> "Pls **don't make your demo video at the last minute!!** Plan the presentation out and
+> **don't build way more than you have to**. Focus on your core idea/solution and less about
+> side stuff. **3 minutes is not a lot of time!**"
+
+> "**Don't worry much about stuff like login pages, auth, 2fa, etc**, unless that is genuinely
+> a part of your core idea!"
+
+> "Spend more time on **planning your idea** than anything else! Great ideas are clear,
+> presentable, and genuinely novel."
+
+**What this changes for Tieout:**
+- STOP building features. Rayed says explicitly not to build more than needed. Everything from
+  here is grounding, presentation and submission.
+- The portal login stays (evidence from a no-API source IS our core idea) but do NOT invest
+  another minute in auth, sessions or 2FA. That box is ticked.
+- Every remaining hour should go at question 4: *would an accountant actually use this?*
+
+### Also announced
+- TensorMux gives **50 million tokens**, not $5 of credit. ~140 agent tasks. Ping them to top up.
+  Post on X/LinkedIn tagging @tensormux with #BuiltWithTensormux for a free month afterwards.
+- GPT-5 Nano access from AI Grants India: https://aigrants.in/form?ref=ao
+- Neatlogs office hours ran 1-2pm IST Sunday.
+
 ## The event (Notion + Luma + Discord, 2026-09-03)
 
 - Syndicate by Maximor, hosted by AO. Sep 5 21:30 IST → Sep 7 03:30 IST. Online.
