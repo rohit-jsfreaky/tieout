@@ -16,6 +16,7 @@ import {
   day,
   exceptionKindLabel,
   factKindLabel,
+  limitLabel,
   money,
 } from "@/lib/format";
 
@@ -67,10 +68,14 @@ export function PolicyCard({ row, fresh }: { row: PolicyRow; fresh: boolean }) {
           </div>
         </dl>
 
+        {/* The ceiling is inherited, not chosen: a rule may never clear more than
+            the person who approved it could have cleared by hand. It sits next to
+            their name because it is part of who signed this. */}
         <p className="text-ledger flex items-start gap-1.5 text-[12px] leading-snug font-medium">
           <Stamp size={13} weight="fill" className="mt-[2px] shrink-0" aria-hidden />
           <span>
-            {policy.approved_by} · {day(policy.approved_at)}
+            {policy.approved_by} (limit {limitLabel(policy.authority_ceiling)}) ·{" "}
+            {day(policy.approved_at)}
           </span>
         </p>
 
@@ -107,11 +112,14 @@ export function PolicyCard({ row, fresh }: { row: PolicyRow; fresh: boolean }) {
 }
 
 /**
- * The rule's "when", in the order `PolicyCondition.describe()` writes it.
+ * The rule's "when", in the order `PolicyCondition.describe()` writes it, plus
+ * the authority ceiling.
  *
  * That method is a plain Python method, so it is not on the wire — but every
  * field it reads is, and this is a rendering of those fields, not a second
- * opinion about them.
+ * opinion about them. The ceiling is not part of the condition — `policy.covers`
+ * checks it separately — but it stops the rule exactly like the tolerances do,
+ * so it is read here exactly like them.
  */
 function conditionLines({ policy }: PolicyRow): string[] {
   const when = policy.condition;
@@ -127,6 +135,9 @@ function conditionLines({ policy }: PolicyRow): string[] {
   }
   if (when.max_exposure !== null) {
     lines.push(`exposure ≤ ${money(when.max_exposure)}`);
+  }
+  if (policy.authority_ceiling !== null) {
+    lines.push(`payment ≤ ${money(policy.authority_ceiling)}`);
   }
   if (when.requires.length > 0) {
     lines.push(

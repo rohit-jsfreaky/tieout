@@ -13,6 +13,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import type {
+  AuthorityRow,
   DecidableAction,
   EngineEvent,
   ExceptionDetail,
@@ -21,11 +22,13 @@ import type {
   Metrics,
   PolicyRow,
   QueueRow,
+  Role,
   Source,
 } from "./api-types";
 import {
   ApiError,
   decideException,
+  getAuthority,
   getException,
   getMetrics,
   getPolicies,
@@ -65,6 +68,17 @@ export interface AuditEntry {
   auto: boolean;
 }
 
+/**
+ * Who is at the desk: a name AND a seat.
+ *
+ * The seat is never inferred from the name — `engine/authority.py` refuses to
+ * guess what somebody may approve, and so does this screen.
+ */
+export interface Approver {
+  name: string;
+  role: Role;
+}
+
 export interface Desk {
   view: View;
   setView: (view: View) => void;
@@ -82,8 +96,17 @@ export interface Desk {
   /** Every fact, decision and rule across every exception, oldest first. */
   audit: AuditEntry[];
   auditLoading: boolean;
-  approver: string;
-  setApprover: (name: string) => void;
+  approver: Approver;
+  setApprover: (approver: Approver) => void;
+  /** The delegation-of-authority matrix, exactly as `GET /authority` sent it. */
+  authority: AuthorityRow[];
+  /** The engine's own sentence about where a real matrix comes from. */
+  authorityNote: string;
+  /**
+   * The approver's own row in that matrix — `null` until it lands, so the screen
+   * can say "—" rather than pretend an unknown limit is no limit.
+   */
+  approverSeat: AuthorityRow | null;
   /** The rule the last approval created, so its card can announce itself. */
   learned: string | null;
   pending: Pending;
@@ -97,7 +120,7 @@ export interface Desk {
   reset: () => void;
 }
 
-const DEFAULT_APPROVER = "Chris, Controller";
+const DEFAULT_APPROVER: Approver = { name: "Chris", role: "Controller" };
 
 function say(failure: unknown): string {
   if (failure instanceof ApiError) return failure.message;
@@ -115,7 +138,9 @@ export function useDesk(): Desk {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [audit, setAudit] = useState<AuditEntry[]>([]);
   const [auditLoading, setAuditLoading] = useState(false);
-  const [approver, setApprover] = useState(DEFAULT_APPROVER);
+  const [approver, setApprover] = useState<Approver>(DEFAULT_APPROVER);
+  const [authority, setAuthority] = useState<AuthorityRow[]>([]);
+  const [authorityNote, setAuthorityNote] = useState("");
   const [learned, setLearned] = useState<string | null>(null);
   const [pending, setPending] = useState<Pending>(null);
   const [loading, setLoading] = useState(true);
@@ -180,6 +205,26 @@ export function useDesk(): Desk {
       closeStream.current?.();
     };
   }, [loadBoard, loadDetail]);
+
+  // The matrix is a constant of the engine, so it is read once. Nothing on this
+  // screen ever states a limit that did not come out of this call — a number an
+  // approval is blocked by is not a number a frontend gets to invent.
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      try {
+        const answer = await getAuthority();
+        if (!alive) return;
+        setAuthority(answer.matrix);
+        setAuthorityNote(answer.note);
+      } catch (failure) {
+        if (alive) setError(say(failure));
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   /* -------------------------------------------------------------------- audit */
 
@@ -288,7 +333,7 @@ export function useDesk(): Desk {
   const decide = useCallback(
     (action: DecidableAction, note: string) => {
       const id = selectedRef.current;
-      const by = approver.trim();
+      const by = approver.name.trim();
       if (!id || pending) return;
       if (!by) {
         setError(
@@ -301,7 +346,14 @@ export function useDesk(): Desk {
 
       void (async () => {
         try {
-          const answer = await decideException(id, { action, by, note });
+          // The seat travels with the name, always. The engine will not record a
+          // decision whose authority nobody can check.
+          const answer = await decideException(id, {
+            action,
+            by,
+            role: approver.role,
+            note,
+          });
           setLearned(answer.policy?.ref ?? null);
           setRun(null);
           if (answer.policy) {
@@ -395,6 +447,11 @@ export function useDesk(): Desk {
     [queue],
   );
 
+  const approverSeat = useMemo(
+    () => authority.find((row) => row.role === approver.role) ?? null,
+    [authority, approver.role],
+  );
+
   const dismissError = useCallback(() => setError(null), []);
 
   return {
@@ -413,6 +470,9 @@ export function useDesk(): Desk {
     auditLoading,
     approver,
     setApprover,
+    authority,
+    authorityNote,
+    approverSeat,
     learned,
     pending,
     loading,

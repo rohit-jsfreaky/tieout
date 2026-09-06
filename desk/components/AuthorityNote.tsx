@@ -1,7 +1,8 @@
 import { ArrowFatLineUp } from "@phosphor-icons/react";
 
-import type { Decision } from "@/lib/api-types";
-import { limitLabel, money } from "@/lib/format";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import type { AuthorityRow, Decision } from "@/lib/api-types";
+import { money, roleArticle } from "@/lib/format";
 import type { Approver } from "@/lib/useDesk";
 
 /**
@@ -9,60 +10,73 @@ import type { Approver } from "@/lib/useDesk";
  * allowed to do it.
  *
  * Both numbers came off the wire: `amount_for_authority` is published by the
- * engine on every decision, and the limit is the row for this seat in the matrix
+ * engine on every decision, and the limit is this seat's row in the matrix
  * `GET /authority` returned. The comparison here only decides what to *say* —
- * the engine blocks the approval server-side whatever this screen believes.
+ * `investigate.apply_human_decision` blocks the approval server-side whatever
+ * this screen believes, and records the attempt as an escalation.
  */
 export function AuthorityNote({
   decision,
   approver,
-  approverLimit,
+  seat,
 }: {
   decision: Decision;
   approver: Approver;
-  /** `null` means no limit, or that the matrix has not landed yet. Warn on neither. */
-  approverLimit: number | null;
+  /** The approver's row in the matrix, or `null` while it is still in the air. */
+  seat: AuthorityRow | null;
 }) {
   const amount = decision.amount_for_authority;
-  if (amount === null || decision.authority_needed === null) return null;
+  const needed = decision.authority_needed;
+  if (amount === null || needed === null) return null;
 
-  const above = approverLimit !== null && amount > approverLimit;
+  const limit = seat?.limit ?? null;
+  const above = seat !== null && limit !== null && amount > limit;
+
+  if (above) {
+    // A decision that has already been recorded was signed by a seat that could
+    // sign it, so the warning would be a lie. Say what actually happened instead.
+    const recorded =
+      decision.approved_by !== null && decision.action !== "escalate";
+    return (
+      <Alert className="bg-mist border-ink/10">
+        <ArrowFatLineUp weight="fill" aria-hidden />
+        <AlertTitle className="leading-relaxed text-balance">
+          {money(amount)} is above {roleArticle(approver.role)} {approver.role}
+          &apos;s {money(limit)} limit. This needs the {needed}.
+        </AlertTitle>
+        <AlertDescription className="text-[12px] leading-relaxed">
+          {recorded
+            ? `Recorded by ${decision.approved_by}, who could sign it. This seat could not have.`
+            : `Approving from this seat is blocked and recorded as an escalation. Change the seat to ${needed} and the same evidence pack goes through.`}
+        </AlertDescription>
+      </Alert>
+    );
+  }
 
   return (
-    <div
-      className={`mt-3 rounded-md px-3 py-2.5 ${
-        above ? "bg-ink/6" : "bg-soft"
-      }`}
-    >
-      <p className="flex items-start gap-2 text-[12px] leading-relaxed">
-        {above ? (
-          <ArrowFatLineUp
-            size={13}
-            weight="fill"
-            className="mt-[3px] shrink-0"
-            aria-hidden
-          />
-        ) : null}
-        <span>
-          {above ? (
-            <>
-              <span className="font-medium">
-                {money(amount)} is above your {limitLabel(approverLimit)} limit
-                as {approver.role}. This needs the {decision.authority_needed}.
-              </span>{" "}
-              <span className="text-faint">
-                Approving from this seat will be blocked and recorded.
-              </span>
-            </>
-          ) : (
-            <span className="text-muted">
-              Authorises {money(amount)} for payment —{" "}
-              {decision.authority_needed} authority. You are a {approver.role}
-              {approverLimit === null ? "" : `, limit ${money(approverLimit)}`}.
-            </span>
-          )}
-        </span>
-      </p>
-    </div>
+    <p className="text-muted-foreground text-[12px] leading-relaxed">
+      Authorises {money(amount)} for payment — {needed} authority.{" "}
+      {seat === null
+        ? `Your limit as ${roleArticle(approver.role)} ${approver.role} has not loaded yet.`
+        : limit === null
+          ? `As ${roleArticle(approver.role)} ${approver.role} you sign with no limit.`
+          : `As ${roleArticle(approver.role)} ${approver.role} you may sign up to ${money(limit)}.`}
+    </p>
+  );
+}
+
+/**
+ * Whether this decision is above the approver's limit — the one place that
+ * comparison is written, so the alert and the disabled Approve button can never
+ * disagree with each other.
+ */
+export function aboveAuthority(
+  decision: Decision | null,
+  seat: AuthorityRow | null,
+): boolean {
+  if (decision === null || seat === null || seat.limit === null) return false;
+  return (
+    decision.amount_for_authority !== null &&
+    decision.amount_for_authority > seat.limit
   );
 }

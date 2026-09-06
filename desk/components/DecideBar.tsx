@@ -29,7 +29,10 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Spinner } from "@/components/ui/spinner";
-import type { DecidableAction } from "@/lib/api-types";
+import type { AuthorityRow, DecidableAction } from "@/lib/api-types";
+import type { Approver } from "@/lib/useDesk";
+
+import { RoleSelect } from "./RoleSelect";
 
 /**
  * The one human touch.
@@ -38,8 +41,9 @@ import type { DecidableAction } from "@/lib/api-types";
  * action and records that. Edit is for the times it proposed the wrong thing:
  * pick what should happen instead and say why, in the same breath.
  *
- * The approver's name is on this card and not somewhere else, because it is
- * about to be stamped onto a rule that will clear invoices without asking again.
+ * The approver's name AND seat are on this card and not somewhere else, because
+ * both are about to be stamped onto a rule that will clear invoices without
+ * asking again — and the seat is the ceiling that rule can never exceed.
  */
 const EDITS: { value: DecidableAction; label: string }[] = [
   { value: "short_pay", label: "Short-pay the difference" },
@@ -51,14 +55,23 @@ const EDITS: { value: DecidableAction; label: string }[] = [
 export function DecideBar({
   approver,
   setApprover,
+  authority,
   busy,
   disabled,
+  blocked,
   onDecide,
 }: {
-  approver: string;
-  setApprover: (name: string) => void;
+  approver: Approver;
+  setApprover: (approver: Approver) => void;
+  authority: AuthorityRow[];
   busy: boolean;
   disabled: boolean;
+  /**
+   * The proposal authorises more than this seat may sign. Approve is off; Reject
+   * needs no spending authority and Edit may resolve to a smaller payment, so
+   * both stay on and the engine decides.
+   */
+  blocked: boolean;
   onDecide: (action: DecidableAction, note: string) => void;
 }) {
   const [editing, setEditing] = useState(false);
@@ -72,7 +85,7 @@ export function DecideBar({
   };
 
   const stop = busy || disabled;
-  const named = approver.trim();
+  const named = approver.name.trim();
 
   return (
     <Card>
@@ -87,16 +100,27 @@ export function DecideBar({
         <FieldGroup>
           <Field orientation="responsive">
             <FieldLabel htmlFor="approver">Approver</FieldLabel>
-            <Input
-              id="approver"
-              name="approver"
-              value={approver}
-              onChange={(event) => setApprover(event.target.value)}
-              placeholder="Chris, Controller"
-              className="sm:max-w-64"
-            />
+            <div className="flex flex-wrap items-center gap-2">
+              <Input
+                id="approver"
+                name="approver"
+                value={approver.name}
+                onChange={(event) =>
+                  setApprover({ ...approver, name: event.target.value })
+                }
+                placeholder="Chris"
+                className="w-44"
+              />
+              <RoleSelect
+                id="approver-role"
+                authority={authority}
+                value={approver.role}
+                onChange={(role) => setApprover({ ...approver, role })}
+              />
+            </div>
             <FieldDescription>
-              This name goes on the rule, and every later auto-clear cites it.
+              This name and this seat go on the rule; every later auto-clear
+              cites them, and the rule may never clear more than the seat could.
             </FieldDescription>
           </Field>
         </FieldGroup>
@@ -107,7 +131,7 @@ export function DecideBar({
           <Button
             variant="ledger"
             size="lg"
-            disabled={stop || named === ""}
+            disabled={stop || named === "" || blocked}
             onClick={() => send("approve")}
           >
             {busy ? (
@@ -137,7 +161,7 @@ export function DecideBar({
             Edit
           </Button>
           <span className="text-faint ml-auto text-[12px]">
-            as {named || "— nobody —"}
+            as {named ? `${named}, ${approver.role}` : "— nobody —"}
           </span>
         </div>
 

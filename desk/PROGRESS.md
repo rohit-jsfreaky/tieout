@@ -2,7 +2,60 @@
 
 > Working memory for this folder. Read first, update before ending every session.
 
-## Current state — 2026-09-06 (S6, approval authority limits)
+## Current state — 2026-09-06 (S7, authority wired into the shadcn desk)
+
+**Approval authority is on the real screen now.** S6 built it on the old three-panel
+components; `master` had already replaced those with the shadcn rebuild, so the merge kept the
+types and lost the UI. This session put it back on the components that actually render, and
+`AuthorityNote` was rewritten as a shadcn `Alert` rather than a hand-rolled div.
+
+Driven end to end against a live `python -m tieout.api` and a real Chromium — reset, the four
+beats, the block, and the CFO clearing the same pack — **21 of 21 checks pass with no page
+errors and no console errors**. `npm run typecheck`, `npm run lint` and `npm run build` clean.
+
+- **`useDesk.approver` is an `Approver { name, role }`**, never a string somebody typed. It
+  also exposes `authority` (the matrix, read once from `GET /authority`), `authorityNote` (the
+  engine's own sentence about where a real matrix comes from) and `approverSeat` — the
+  approver's row in that matrix, `null` until it lands, because unknown and unlimited are not
+  the same thing. `decide` sends `by` and `role` as two fields; the engine never has to guess.
+- **`RoleSelect` (new)** is the seat control, on the decide bar and on Settings. Its options
+  are the rows of the matrix and nothing else — "Controller · $10,000.00" — so the screen can
+  never offer a seat or a limit the engine did not publish. Before the matrix lands it holds
+  one option and is disabled.
+- **Settings has the matrix**, as a `Table` straight off `GET /authority`, the approver's own
+  row highlighted, with the API's own note as the card description. No number in this folder
+  is typed by hand.
+- **`AuthorityNote` is a shadcn `Alert`** when the decision authorises more than the seat may
+  sign: *"$12,750.00 is above a Controller's $10,000.00 limit. This needs the CFO."* plus what
+  happens next. Under the limit it is a quiet line, not an alert — "Authorises $1,757.50 for
+  payment — Controller authority. As a Controller you may sign up to $10,000.00." Both numbers
+  are off the wire (`decision.amount_for_authority`, the seat's row). `aboveAuthority()` is the
+  single comparison, so the alert and the disabled button can never disagree.
+- **Approve is disabled above the limit.** Reject needs no spending authority and Edit can
+  resolve to a smaller payment, so both stay live — and if you insist through Edit, the engine
+  escalates and the card reads **"Above their authority — escalated"** with the engine's own
+  sentence on it. An escalation is deliberately not "settled": the decide bar stays open,
+  switch the seat to CFO and the same evidence pack goes through. That is the fifth beat.
+- **E5 reads as both at once**, which was the point: "NOT CONFIDENT — YOU DECIDE" with 0 of 4
+  checks and every dead end listed, and directly under it the alert saying the payment is above
+  a Controller's authority. Two independent reasons this cannot end at this desk.
+- **`PolicyCard` shows the inherited ceiling** — "Chris, Controller (limit $10,000.00) ·
+  6 Sept 2026" — and "payment ≤ $10,000.00" sits in the rule's When list next to the tolerance
+  and the exposure. It is not part of `PolicyCondition` (`policy.covers` checks it separately)
+  but it stops the rule exactly like they do, so it is read exactly like them.
+- **`StatusBadge` knows `escalated`** ("Above their limit"), which the rebuild's `Record` had
+  been missing since the type gained the state.
+- `format.ts` gained `roleArticle` — "an AP Clerk", "a Controller". Grammar, not policy; the
+  engine keeps the same little table for the sentences it writes.
+
+### Known, not fixed
+
+A `~/.tieout` store written by a build from **before** approval authority makes `GET /metrics`
+and `GET /policies` return 500 — the old policy rows have no `approved_role` and pydantic
+refuses them. `POST /reset` clears it, which is what the desk's Reset button does. It cannot
+happen to a fresh clone; it happened once on this machine.
+
+## Earlier — 2026-09-06 (S6, approval authority limits, on the pre-rebuild components)
 
 **The approver is no longer just a name.** The control bar has a name AND a seat, and the seat
 carries a limit. `npm run typecheck`, `npm run lint` and `npm run build` are clean, and the
@@ -180,9 +233,10 @@ it is a `FileResponse` over `engine.sources.portal.screenshot_dir()`, and
 
 ## Next action
 
-Nothing in this folder. Phase 4 is done, hardened, and rebuilt as a proper app, and the README
-is written — though the README predates the sidebar, so its description of the screen is worth
-a second look. What is left is Rohit's: the video and the Discord post.
+Nothing in this folder. Phase 4 is done, hardened, rebuilt as a proper app and now carries the
+authority control on every view that needs it. The README predates the sidebar and the matrix,
+so its description of the screen is worth a second look. What is left is Rohit's: the video and
+the Discord post.
 
 ## Decisions made
 
@@ -244,6 +298,12 @@ toggle), verified twice with zero console errors. Record the demo from a normal 
 
 ## Session log
 
+- **2026-09-06 (S7, `authority on the shadcn desk`)** — rewired approval authority onto the
+  rebuilt desk: `Approver` in `useDesk`, `RoleSelect` off the matrix, the matrix table on
+  Settings, `AuthorityNote` as a shadcn `Alert`, Approve disabled above the limit, the
+  escalated state on `DecisionCard` and `StatusBadge`, and the ceiling on `PolicyCard`. Driven
+  through reset → E1 → approve → E2 → E5 → escalate → CFO → Settings by a throwaway Playwright
+  harness (since deleted): 21 of 21 checks, no page errors. Typecheck, lint and build clean.
 - **2026-09-06 (S5, harden + ship)** — five full passes of the four beats through the screen,
   driven by a throwaway Playwright harness against a live API and a real Chromium. Fixed the
   two staleness bugs above and added the "Still open" counter. Typecheck, lint and build clean.

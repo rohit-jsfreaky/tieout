@@ -10,8 +10,8 @@ type Variant = React.ComponentProps<typeof Badge>["variant"];
  * Where an exception stands, in one word.
  *
  * The accent is spent on `auto_cleared`, because that is the state the whole
- * project exists to produce; "awaiting a person" is filled ink, because it is
- * the only state that is asking for something.
+ * project exists to produce; "awaiting a person" and "above their limit" are
+ * filled ink, because they are the states that are asking for something.
  */
 const TONE: Record<ExceptionStatus, Variant> = {
   open: "outline",
@@ -19,6 +19,7 @@ const TONE: Record<ExceptionStatus, Variant> = {
   refused: "outline",
   auto_cleared: "ledger",
   resolved: "secondary",
+  escalated: "default",
 };
 
 export function StatusBadge({

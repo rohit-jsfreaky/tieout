@@ -30,14 +30,26 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { DEFAULT_API_BASE, apiBase, setApiBase } from "@/lib/api";
+import { limitLabel } from "@/lib/format";
 import type { Desk } from "@/lib/useDesk";
 
+import { RoleSelect } from "../RoleSelect";
+
 /**
- * The three things that are configuration rather than evidence.
+ * The four things that are configuration rather than evidence.
  *
- * The approver's name is here and on the decision card, because it is the one
- * setting that ends up written into the product's output.
+ * The approver's name and seat are here and on the decision card, because they
+ * are the settings that end up written into the product's output — the name on
+ * the rule, and the ceiling that rule can never exceed.
  */
 export function SettingsView({ desk }: { desk: Desk }) {
   // Settings is only ever reached by clicking the sidebar, so this initialiser
@@ -58,25 +70,82 @@ export function SettingsView({ desk }: { desk: Desk }) {
         <CardHeader>
           <CardTitle>Approver</CardTitle>
           <CardDescription>
-            Whose name goes on a rule. Every exception a rule later clears cites
-            this person, which is what makes an auto-clear auditable.
+            Whose name goes on a rule, and what that person is allowed to sign.
+            Every exception a rule later clears cites this person, which is what
+            makes an auto-clear auditable.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <FieldGroup>
-            <Field>
-              <FieldLabel htmlFor="settings-approver">Name and role</FieldLabel>
+            <Field orientation="responsive">
+              <FieldLabel htmlFor="settings-approver">Name</FieldLabel>
               <Input
                 id="settings-approver"
-                value={desk.approver}
-                onChange={(event) => desk.setApprover(event.target.value)}
-                placeholder="Chris, Controller"
+                value={desk.approver.name}
+                onChange={(event) =>
+                  desk.setApprover({ ...desk.approver, name: event.target.value })
+                }
+                placeholder="Chris"
+                className="w-44"
+              />
+            </Field>
+            <Field orientation="responsive">
+              <FieldLabel htmlFor="settings-role">Seat</FieldLabel>
+              <RoleSelect
+                id="settings-role"
+                authority={desk.authority}
+                value={desk.approver.role}
+                onChange={(role) => desk.setApprover({ ...desk.approver, role })}
               />
               <FieldDescription>
-                Used the moment you press Approve on an exception.
+                {desk.approverSeat === null
+                  ? "The matrix has not loaded, so this seat's limit is unknown — not unlimited."
+                  : `May approve ${limitLabel(desk.approverSeat.limit)} · that ceiling goes on every rule this seat's approval creates.`}
               </FieldDescription>
             </Field>
           </FieldGroup>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Delegation of authority</CardTitle>
+          <CardDescription>
+            {desk.authorityNote ||
+              "Read from GET /authority — the desk never states a limit the engine did not publish."}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="px-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Seat</TableHead>
+                <TableHead className="text-right">May approve up to</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {desk.authority.map((row) => (
+                <TableRow
+                  key={row.role}
+                  data-state={
+                    row.role === desk.approver.role ? "selected" : undefined
+                  }
+                >
+                  <TableCell className="font-medium">{row.role}</TableCell>
+                  <TableCell className="text-right font-mono">
+                    {limitLabel(row.limit)}
+                  </TableCell>
+                </TableRow>
+              ))}
+              {desk.authority.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={2} className="text-muted-foreground">
+                    The matrix has not loaded yet.
+                  </TableCell>
+                </TableRow>
+              ) : null}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
 

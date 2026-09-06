@@ -3,7 +3,24 @@
 > Read this first, every session. Update it before ending the session.
 > Per-folder detail: `backend/PROGRESS.md`, `desk/PROGRESS.md`.
 
-## Current state — 2026-09-06 (S6, `approval authority limits`)
+## Current state — 2026-09-06 (S7, `authority on the shadcn desk`)
+
+- **Approval authority is on the real screen now.** S6 built the desk half of it on the old
+  three-panel components, which `master` had already replaced with the shadcn rebuild — so the
+  merge kept the types and lost the UI. This session put it back where it renders: the approver
+  is a name and a seat everywhere, the seat select and the matrix table on Settings come
+  straight from `GET /authority`, the over-limit warning is a shadcn `Alert` with Approve
+  disabled behind it, the escalated state is on the decision card and the status badge, and a
+  rule's inherited ceiling is on its policy card.
+- **Verified live**, reset → E1 → approve → E2 → E5 → escalate → CFO → Settings against a real
+  API and a real Chromium: 21 of 21 checks, no page errors. Desk typecheck, lint, build clean.
+  No backend change; `pytest backend/tests` untouched at 56 green from S6.
+- One gotcha found, not a code bug: a `~/.tieout` store written **before** approval authority
+  makes `/metrics` and `/policies` 500, because its policy rows have no `approved_role`. Reset
+  clears it. A fresh clone cannot hit it.
+- **Still left for Rohit:** the demo video and the Discord post. Nothing else.
+
+## Earlier today — 2026-09-06 (S6, `approval authority limits`)
 
 - **One feature added, and it is the last one: approval authority.** Before this, anyone could
   approve anything. Now there is a **delegation-of-authority matrix** — AP Clerk 1,000 ·

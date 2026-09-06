@@ -28,6 +28,7 @@ import type { EngineEvent, Fact } from "@/lib/api-types";
 import { exceptionKindLabel, money, sourceLabel } from "@/lib/format";
 import type { Desk } from "@/lib/useDesk";
 
+import { AuthorityNote, aboveAuthority } from "../AuthorityNote";
 import { BrowserPanel } from "../BrowserPanel";
 import { DecideBar } from "../DecideBar";
 import { DecisionCard } from "../DecisionCard";
@@ -53,10 +54,15 @@ export function ExceptionView({ desk }: { desk: Desk }) {
   const exception = desk.detail?.exception;
   const decision = desk.detail?.decision ?? lastDecision(desk.live);
   const refused = decision?.action === "refuse";
+  const escalated = decision?.action === "escalate";
   const running = desk.runningId !== null && desk.runningId === desk.selectedId;
   const busy = desk.pending !== null;
   const worked = desk.facts.length > 0 || decision !== null;
-  const settled = decision?.approved_by != null;
+  // An escalation is deliberately not settled: nothing was paid and nothing was
+  // learned, so the decide bar stays open — change the seat and the same pack
+  // goes through. That is the fifth beat.
+  const settled = decision?.approved_by != null && !escalated;
+  const blocked = aboveAuthority(decision, desk.approverSeat);
 
   // The browser panel follows the run: the newest screenshot, unless a fact card
   // was clicked, and only while that fact still belongs to the pack on screen.
@@ -153,12 +159,25 @@ export function ExceptionView({ desk }: { desk: Desk }) {
           )
         ) : null}
 
+        {/* E5 reads as both at once, which is the point: refused for want of
+            evidence, AND above the seat at this desk. Two independent reasons
+            this cannot end here. */}
+        {decision && !decision.auto ? (
+          <AuthorityNote
+            decision={decision}
+            approver={desk.approver}
+            seat={desk.approverSeat}
+          />
+        ) : null}
+
         {decision && !decision.auto && !settled ? (
           <DecideBar
             approver={desk.approver}
             setApprover={desk.setApprover}
+            authority={desk.authority}
             busy={busy}
             disabled={running}
+            blocked={blocked}
             onDecide={desk.decide}
           />
         ) : null}

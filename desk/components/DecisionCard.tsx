@@ -18,11 +18,13 @@ import { ConfidenceBar } from "./ConfidenceBar";
 /**
  * What Tieout wants to do, or what has already been done.
  *
- * Three states share one card, because they are the same object: the proposal
- * waiting for a person, the auto-clear that cited a learned rule, and the
- * decision a person actually recorded.
+ * Four states share one card, because they are the same object: the proposal
+ * waiting for a person, the auto-clear that cited a learned rule, the decision a
+ * person actually recorded — and the one they were not allowed to record, which
+ * is an outcome with a name on it rather than an error.
  */
 export function DecisionCard({ decision }: { decision: Decision }) {
+  const escalated = decision.action === "escalate";
   const settled = decision.approved_by !== null;
   return (
     <Card>
@@ -30,9 +32,11 @@ export function DecisionCard({ decision }: { decision: Decision }) {
         <CardTitle className="text-faint text-[11px] font-medium tracking-[0.1em] uppercase">
           {decision.auto
             ? "Cleared by a learned rule"
-            : settled
-              ? "Decision recorded"
-              : "Proposed decision"}
+            : escalated
+              ? "Above their authority — escalated"
+              : settled
+                ? "Decision recorded"
+                : "Proposed decision"}
         </CardTitle>
         <CardAction>
           <Badge variant={decision.auto ? "ledger" : "secondary"}>
@@ -70,7 +74,10 @@ export function DecisionCard({ decision }: { decision: Decision }) {
 
         {!decision.auto && settled ? (
           <p className="text-muted-foreground text-[12px]">
-            {decision.approved_by} · {day(decision.decided_at)}
+            {escalated
+              ? `${decision.approved_by} tried to sign this`
+              : decision.approved_by}{" "}
+            · {day(decision.decided_at)}
             {decision.note ? ` · “${decision.note}”` : ""}
           </p>
         ) : null}

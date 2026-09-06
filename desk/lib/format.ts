@@ -10,6 +10,7 @@ import type {
   ExceptionKind,
   ExceptionStatus,
   FactKind,
+  Role,
   Source,
 } from "./api-types";
 
@@ -89,6 +90,21 @@ export const sourceLabel = (source: Source) => SOURCE[source];
 export function limitLabel(limit: number | null): string {
   return limit === null ? "no limit" : money(limit);
 }
+
+/**
+ * "an AP Clerk", "a Controller".
+ *
+ * Grammar, not policy. `engine/authority.py` keeps the same little table for the
+ * sentences it writes, because how a title is said out loud decides this rather
+ * than its first letter. The limits still only ever come from `GET /authority`.
+ */
+const ARTICLE: Record<Role, string> = {
+  "AP Clerk": "an",
+  Controller: "a",
+  CFO: "a",
+};
+
+export const roleArticle = (role: Role) => ARTICLE[role];
 
 /** A Fact says who read it: `"code"`, or the id of the model that did. */
 export function readerLabel(extractedBy: string): string {
