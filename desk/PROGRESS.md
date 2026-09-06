@@ -31,27 +31,63 @@
 
 ## Earlier — 2026-09-06
 
-- **4a, 4b, 4c and 4d are DONE.** The four beats can be driven from the screen with no
-  terminal open, against a live `python -m tieout.api` on :8700. `npm run typecheck`,
-  `npm run lint` and `npm run build` are clean.
-- **No mock mode anywhere.** Every figure on the screen came out of `GET /metrics` or off the
-  SSE stream in that session. `lib/api.ts` is still the only file that fetches.
+- **4a, 4b, 4c and 4d are DONE, and the desk has since been rebuilt as a proper app**
+  (2026-09-06, S8): shadcn/ui on Base UI, a sidebar, and five real views instead of three
+  panels with no navigation. `npm run typecheck`, `npm run lint` and `npm run build` are clean.
+- **No mock mode anywhere.** Every figure on the screen came out of `GET /metrics`, `GET /queue`,
+  `GET /policies` or the SSE stream in that session. `lib/api.ts` is still the only file that
+  fetches or opens a stream.
 - Verified by driving the real screen end to end (a throwaway Playwright script, since deleted)
-  against a real run: the four beats passed and the header read
-  **5 exceptions · 1 human touch · 1 auto-cleared · 1 refused · 12 evidence items ·
-  3 screenshots**.
+  against a live `python -m tieout.api`, at 1600×1000 and again at 700×900, with **zero page
+  errors**. All four beats passed from the screen alone and the counters read
+  **5 exceptions · 1 human touch · 1 auto-cleared · 1 refused · 16 evidence items**.
 
 ## Done
 
+### The rebuild — sidebar, five views, shadcn/ui (2026-09-06)
+
+The problem it fixes: the old screen was three columns with no navigation and no instructions.
+A judge with three minutes did not know where to click.
+
+- **`npx shadcn@latest init`** on the existing Next 16 / Tailwind v4 project. Registry `@shadcn`,
+  style `base-nova`, base **Base UI** (so custom triggers use `render`, not `asChild`).
+  Components added: sidebar, card, table, badge, separator, button, input, dialog, sheet, tabs,
+  alert, empty, skeleton, sonner, tooltip, scroll-area, field, select, label, spinner.
+  `npx shadcn@latest docs <component>` was read for each one before it was used.
+- **Icons are Phosphor, and only Phosphor.** `components.json` has `iconLibrary: "phosphor"`, so
+  the CLI rewrote every registry icon on the way in (`XIcon`, `CaretDownIcon`, `SidebarIcon` …
+  are all real `@phosphor-icons/react` v2 aliases — checked against `dist/csr/*.d.ts`, not
+  assumed). `lucide-react` and `next-themes` were uninstalled; nothing imports either.
+- **The design system survived.** `app/globals.css` still owns Fraunces/Geist/Geist Mono, the
+  4px radius ladder, `corner-shape: squircle`, `animate-land` and the four inset-shadow
+  utilities. shadcn's semantic layer is *mapped onto* Tieout's palette in one `:root` block —
+  `--background` is white, `--foreground`/`--primary` are ink, `--muted-foreground` is the muted
+  ink, `--muted`/`--accent`/`--secondary` are mist, `--ring` is ledger blue. The result still
+  looks like Tieout.
+- **Five views, one sidebar.** Queue (default) · Exception · Policies · Audit · Settings, with
+  live counts on the sidebar rows.
+- **The guide card.** Dismissible, on the Queue view, three numbered steps — Work E1, Approve it,
+  Work E2 — and a button that works the next untouched exception. This was the point of the
+  session.
+- **Audit is new.** Every fact, decision and learned rule across every exception, in time order,
+  with source, link, screenshot marker, who read it and when. It is assembled in `useDesk` by
+  flattening the packs the API returns; nothing on it is computed here.
+- **Settings is new.** The approver's name, the API base URL (stored in `localStorage`, so the
+  desk can be pointed at an API on another machine without a rebuild), and Reset behind a
+  confirmation dialog.
+- **`sonner` toasts** for the two moments worth announcing: a rule being learned, and an
+  exception clearing itself.
+- `BrowserPanel` was kept exactly as it was, inside a Card in the Exception view's sticky right
+  column.
+
 ### 4b — queue + evidence pack
 
-- `lib/api-types.ts` **rewritten against the real backend.** The 4a version was a guess from
-  `backend/PLAN.md`; every shape is now mirrored from `engine/models.py` and `engine/events.py`
-  in the same order, because `api/schemas.py` re-exports them unchanged. Pydantic
-  `computed_field`s (`exposure`, `short_pct`, `Policy.ref`, …) are on the wire, so the desk
-  never recomputes a number the engine published. The 4a guesses are gone: there is no
-  `exception_class` (it is `kind`), no `Refusal` object (a refusal is a `Decision` with
-  `action: "refuse"`), and the queue is `{count, exceptions: QueueRow[]}`, not a bare array.
+- `lib/api-types.ts` **written against the real backend**, mirrored from `engine/models.py` and
+  `engine/events.py` in the same order, because `api/schemas.py` re-exports them unchanged.
+  Pydantic `computed_field`s (`exposure`, `short_pct`, `Policy.ref`, …) are on the wire, so the
+  desk never recomputes a number the engine published. There is no `exception_class` (it is
+  `kind`), no `Refusal` object (a refusal is a `Decision` with `action: "refuse"`), and the queue
+  is `{count, exceptions: QueueRow[]}`, not a bare array.
 - `lib/api.ts` — nine routes and one stream. `ApiError` carries FastAPI's own `detail`, so a
   409 reads "an investigation is already running on E1" rather than "Failed to fetch".
   `streamException` subscribes to all twelve `EventKind`s plus `done`, because sse-starlette
@@ -60,18 +96,15 @@
 - `lib/useDesk.ts` — the whole state. Live events are merged into the fetched pack by id
   (facts) and by `source|action|locator|at` (steps), so the same list works mid-run and at
   rest with no second code path.
-- Queue rows: class, status, billed amount, exposure, fact count, live "working" spinner.
-- Evidence pack: one `FactCard` per fact with its source chip, its clickable locator, the
-  time, **whether code or the model read it**, and the portal screenshot as a thumbnail.
-- Proposed decision with the confidence bar and the written checklist under it; the refusal
-  gets its own card with the full "here is where I looked" list, every dead end included.
+- Evidence: one `FactCard` per fact with its source chip, its clickable locator, the time,
+  **whether code or the model read it**, and the portal screenshot as a thumbnail.
 
 ### 4c — decide + policies + counters
 
-- `DecideBar`: Approve / Reject / Edit. Approve means "do what Tieout proposed" and the engine
-  resolves it; Edit opens a picker for the other three `DecidableAction`s plus the note that
-  ends up on the rule. The approver's name comes from the control bar and is shown next to
-  the buttons, so nobody presses Approve without seeing whose name goes on the policy.
+- `DecideBar`: Approve / Reject / Edit, **with the approver field on the card itself** — nobody
+  presses Approve without seeing whose name goes on the rule. Approve means "do what Tieout
+  proposed" and the engine resolves it; Edit opens a Select of the other three
+  `DecidableAction`s plus the note that ends up on the rule.
 - `PolicyCard`: id, version, active/superseded, the condition, the action, **the approver and
   the date**, what it was learned from, and what has cited it. The condition is rendered from
   the `PolicyCondition` fields in the order `describe()` writes them — that method is a plain
@@ -79,27 +112,27 @@
 - Counters are six real figures from `GET /metrics`, refetched whenever a run or a decision
   finishes. Empty still reads "—", never `0`.
 - **The moment works.** After one approval, working E2 turns its queue row into
-  **"cleared by SHORT-SHIP-01 v1 · Chris, Controller"** and human touches stays at 1.
+  **"cleared by SHORT-SHIP-01 v1 · Chris, Controller — nobody was asked"** and human touches
+  stays at 1.
 
 ### 4d — polish
 
-- Loading, empty and error states everywhere; `ErrorBanner` shows the API's own words.
-- Reset button (`POST /reset`) puts the world, the memory, the saved session and the
-  screenshots back and reselects E1.
+- Loading (`Skeleton`), empty (`Empty`) and error (`Alert`) states everywhere; the error shows
+  the API's own words.
+- Reset (`POST /reset`) puts the world, the memory, the saved session and the screenshots back
+  and reselects the first exception.
 - `animate-land` — one short arrival for a fact, an auto-clear row and a newborn rule, with a
   `prefers-reduced-motion` escape.
-- The pack reads as one document and follows itself: the newest fact while evidence lands,
-  then the verdict from its first line the moment there is one.
 - `devIndicators: false` — Next's dev badge sat exactly on the approver field, and this screen
   gets recorded from `next dev`.
 
-### The live browser panel (asked for on top of the plan)
+### The live browser panel
 
-A fourth zone. The engine's Playwright session is a real Chromium on the same machine, and
-before this it was invisible unless you ran `HEADLESS=0` and filmed a second window. The panel
-draws a browser chrome, puts the fact's own locator in the address bar, and shows the
-screenshot the agent filed as evidence — updating as each portal fact arrives on the stream.
-Clicking a fact card's thumbnail pins that one.
+The engine's Playwright session is a real Chromium on the same machine, and before this it was
+invisible unless you ran `HEADLESS=0` and filmed a second window. The panel draws a browser
+chrome, puts the fact's own locator in the address bar, and shows the screenshot the agent filed
+as evidence — updating as each portal fact arrives on the stream. Clicking a fact card's
+thumbnail pins that one.
 
 **One route was added to the API to make this possible**, which is the ninth route on a plan
 that said eight. `Fact.screenshot` is an absolute path on the engine's machine
@@ -111,26 +144,43 @@ it is a `FileResponse` over `engine.sources.portal.screenshot_dir()`, and
 
 ## Next action
 
-Nothing in this folder. Phase 4 is done and hardened, and the README is written. What is left
-is Rohit's: the video and the Discord post.
+Nothing in this folder. Phase 4 is done, hardened, and rebuilt as a proper app, and the README
+is written — though the README predates the sidebar, so its description of the screen is worth
+a second look. What is left is Rohit's: the video and the Discord post.
 
 ## Decisions made
 
-- One page, as planned, but **four zones instead of three**: the live browser sits above the
-  policies in the right column. The three-column diagram in `CLAUDE.md` predates the browser
-  panel being asked for.
+- **Views are state, not routes.** `desk/CLAUDE.md` said one page and no second page, and there
+  is a practical reason to keep it that way: `useDesk` stays mounted for the life of the screen,
+  so an SSE run keeps streaming while somebody wanders off to read the rules it just learned.
+  The cost is that the browser Back button does not step between views.
+- **The radius ladder was not touched.** shadcn's components ask for `rounded-lg` on controls and
+  `rounded-xl` on cards; under Tieout's 4px ladder those are 18px and 24px rather than shadcn's
+  10px and 14px. Everything on the screen shares one ladder, and the nesting order is still
+  right (control inside card), so the ladder stayed exactly as the design system defines it.
+- **`--color-muted` had to move.** Tieout used `muted` for an *ink*; shadcn uses it for a
+  *surface*. The muted ink is `text-muted-foreground` now, and every call site was changed.
+  `ink`, `faint`, `mist`, `soft` and `ledger` keep their Tieout names — none of them collide.
+- **`--destructive` is defined but never used.** Tieout has no red state: a refusal is an
+  outcome, not an error, and Reject is an outline button. The token exists so the primitives are
+  whole.
+- **Two variants were added to registry components**, both for the accent: `Button variant="ledger"`
+  (the one filled accent button on the screen — Approve) and `Badge variant="ledger"` (auto-cleared,
+  active rule, "read by the model"). `SidebarMenuButton`'s hover was also split from its active
+  state, which the registry copy had sharing one token, so you can see which view you are on.
+- **`hooks/use-mobile.ts` was rewritten** as a `useSyncExternalStore` read. The registry version
+  sets state inside an effect, which this project's lint rejects.
 - **Approve/Reject/Edit is three buttons, not a form.** The one human touch should cost one
   click; Edit is the escape hatch and hides until it is wanted.
+- **The verdict sits above the evidence.** The reader has to decide and then check, so the
+  proposal and the Approve button are near the top and the facts run underneath in the order
+  they landed. The rationale is never truncated — it is the audit trail.
 - **The live event trail disappears when the run ends.** While it is happening it is the whole
-  point ("signed in to VendorLink as ap-bot@kestrelmfg.com"); afterwards every line of it is
-  in the facts and the checklist, and the pack is what a person reads.
-- **The rationale is never truncated.** It is the audit trail; a `line-clamp` on it would have
-  bought two visible fact cards and cost the thing the project is about.
+  point ("signed in to VendorLink as ap-bot@kestrelmfg.com"); afterwards every line of it is in
+  the facts and the checklist, and the pack is what a person reads.
 - `Screenshot.tsx` is the only `<img>` on the desk and the only eslint-disable. `next/image`
   optimises and caches remote files, and both are wrong for a live artefact of the run
   happening on screen.
-- Phosphor is installed now that there is something for an icon to do (source chips, ticks,
-  the browser chrome, the rule stamp). Still no chart library and no state library.
 - Times are wall-clock (`en-GB`, 24h) because the reader is watching it happen; dates are
   `6 Sept 2026` because that is what goes on a rule.
 
@@ -141,12 +191,20 @@ python -m tieout.api            # :8700 — starts the fake company too
 cd desk && npm run dev          # :3000 (or the next free port — check the log)
 ```
 
-Then, on the screen and nowhere else: **Work E1 → Approve → select E2 → Work E2 → select E5 →
-Work E5.** `NEXT_PUBLIC_API_BASE` moves the API off `http://localhost:8700`.
+Then, on the screen and nowhere else, following the guide card on the Queue view:
+**Work E1 → Approve → Work E2 → open E5 → Work E5.** The API address can be changed on the
+Settings view, or baked in with `NEXT_PUBLIC_API_BASE`.
 
 ## Blockers
 
 None.
+
+## Known environment quirk (not an app bug)
+
+The page **does not hydrate inside AO's desktop Browser panel** — clicks do nothing there and
+the sidebar never appears, with no page errors reported. The same URL in a real Chromium
+hydrates and works at both 1600px (sidebar pinned) and 700px (sidebar in a Sheet behind the
+toggle), verified twice with zero console errors. Record the demo from a normal browser.
 
 ## Session log
 
@@ -158,7 +216,12 @@ None.
   fonts and a new accent, empty four-zone layout, typed API stubs. Verified with a real
   `next dev`, `tsc --noEmit`, `eslint`, `next build` — all clean.
 - **2026-09-06** — 4b, 4c and 4d built, plus the live browser panel. The types were
-  reconciled against the real `engine/models.py`. The four beats were driven from the screen
-  three times end to end against a live API and a real Chromium on the real portal, with
-  screenshots checked each time; the counters on screen are the ones `GET /metrics` returns.
-  Added `GET /screenshots/{name}` to the API — the only backend change — with a test.
+  reconciled against the real `engine/models.py` (4a had guessed them from `backend/PLAN.md`
+  and got several wrong). The four beats were driven from the screen three times end to end
+  against a live API and a real Chromium on the real portal, with screenshots checked each
+  time. Added `GET /screenshots/{name}` to the API — the only backend change — with a test.
+- **2026-09-06 (S8, `desk`)** — rebuilt as a proper app: shadcn/ui on Base UI, a sidebar and
+  five views (Queue, Exception, Policies, Audit, Settings), a dismissible three-step guide card
+  on the queue, toasts, and a Settings view that can repoint the API. Phosphor everywhere, no
+  Lucide, design system intact. Driven end to end against the live API twice; typecheck, lint
+  and build clean.

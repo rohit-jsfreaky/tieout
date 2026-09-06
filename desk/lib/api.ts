@@ -23,8 +23,34 @@ import type {
 } from "./api-types";
 import { EVENT_KINDS } from "./api-types";
 
-export const API_BASE =
+/** Where the API lives unless somebody says otherwise on the Settings view. */
+export const DEFAULT_API_BASE =
   process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8700";
+
+const OVERRIDE_KEY = "tieout.api-base";
+
+/**
+ * The base every call in this file is built on.
+ *
+ * `NEXT_PUBLIC_API_BASE` is baked in at build time, which is no use to someone
+ * running the desk against an API on another machine. Settings writes an
+ * override here instead; on the server there is no override to read, and the
+ * screen shows nothing that depends on it until it has mounted.
+ */
+export function apiBase(): string {
+  if (typeof window === "undefined") return DEFAULT_API_BASE;
+  return window.localStorage.getItem(OVERRIDE_KEY)?.trim() || DEFAULT_API_BASE;
+}
+
+/** Store the override (or clear it, when it is empty or back to the default). */
+export function setApiBase(value: string): void {
+  const cleaned = value.trim().replace(/\/+$/, "");
+  if (cleaned === "" || cleaned === DEFAULT_API_BASE) {
+    window.localStorage.removeItem(OVERRIDE_KEY);
+  } else {
+    window.localStorage.setItem(OVERRIDE_KEY, cleaned);
+  }
+}
 
 /** What the API said went wrong, rather than "Failed to fetch". */
 export class ApiError extends Error {
@@ -44,7 +70,7 @@ async function request<T>(
 ): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(`${API_BASE}${path}`, {
+    response = await fetch(`${apiBase()}${path}`, {
       method,
       headers: body === undefined ? undefined : { "Content-Type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
@@ -53,7 +79,7 @@ async function request<T>(
   } catch {
     throw new ApiError(
       0,
-      `Tieout is not answering on ${API_BASE}. Start it with \`python -m tieout.api\`.`,
+      `Tieout is not answering on ${apiBase()}. Start it with \`python -m tieout.api\`.`,
     );
   }
   if (!response.ok) {
@@ -122,7 +148,7 @@ export function resetWorld(): Promise<ResetResponse> {
  */
 export function screenshotUrl(path: string): string {
   const name = path.replace(/\\/g, "/").split("/").filter(Boolean).pop() ?? "";
-  return `${API_BASE}/screenshots/${encodeURIComponent(name)}`;
+  return `${apiBase()}/screenshots/${encodeURIComponent(name)}`;
 }
 
 export interface StreamHandlers {
@@ -142,7 +168,7 @@ export function streamException(
   id: string,
   handlers: StreamHandlers,
 ): () => void {
-  const source = new EventSource(`${API_BASE}/exceptions/${id}/events`);
+  const source = new EventSource(`${apiBase()}/exceptions/${id}/events`);
   let closed = false;
 
   const close = () => {

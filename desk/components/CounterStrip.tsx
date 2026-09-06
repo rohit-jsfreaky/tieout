@@ -11,19 +11,47 @@ import { Counter } from "./Counter";
  * stand in for five found. Nothing here is typed in, and a counter reads "—"
  * until a real run has supplied it.
  */
-export function CounterStrip({ metrics }: { metrics: Metrics | null }) {
-  const figure = (value: number | undefined) =>
-    value === undefined ? null : String(value);
-
+export function CounterStrip({
+  metrics,
+  loading,
+}: {
+  metrics: Metrics | null;
+  loading: boolean;
+}) {
   return (
-    <div className="well flex gap-1 rounded-lg bg-soft p-1">
-      <Counter label="Exceptions" value={figure(metrics?.exceptions_found)} />
-      <Counter label="Still open" value={figure(metrics?.open_not_worked)} />
-      <Counter label="Human touches" value={figure(metrics?.human_touches)} winning />
-      <Counter label="Auto-cleared" value={figure(metrics?.auto_cleared)} />
-      <Counter label="Refused" value={figure(metrics?.refused)} />
-      <Counter label="Evidence items" value={figure(metrics?.evidence_items)} />
-      <Counter label="Screenshots" value={figure(metrics?.screenshots)} />
+    <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-7">
+      <Counter
+        label="Exceptions"
+        value={metrics?.exceptions_found}
+        loading={loading}
+      />
+      <Counter
+        label="Still open"
+        value={metrics?.open_not_worked}
+        loading={loading}
+      />
+      <Counter
+        label="Human touches"
+        value={metrics?.human_touches}
+        loading={loading}
+        winning
+      />
+      <Counter
+        label="Auto-cleared"
+        value={metrics?.auto_cleared}
+        loading={loading}
+      />
+      <Counter label="Refused" value={metrics?.refused} loading={loading} />
+      <Counter
+        label="Evidence items"
+        value={metrics?.evidence_items}
+        loading={loading}
+      />
+      <Counter
+        label="Screenshots"
+        value={metrics?.screenshots}
+        loading={loading}
+      />
     </div>
   );
 }

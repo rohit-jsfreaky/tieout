@@ -1,26 +1,45 @@
-/** One figure in the strip. `value` is null until a real run supplies it — this
- *  screen never invents a number. `winning` marks the one the demo is about. */
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+
+/**
+ * One figure in the strip.
+ *
+ * `value` is null until a real run supplies it — this screen never invents a
+ * number. `winning` marks the one the demo is about: human touches.
+ */
 export function Counter({
   label,
   value,
+  loading,
   winning = false,
 }: {
   label: string;
-  value: string | null;
+  value: number | undefined;
+  loading: boolean;
   winning?: boolean;
 }) {
   return (
-    <div className="surface flex-1 rounded-md bg-white px-4 py-3">
-      <div className="text-faint text-[11px] font-medium tracking-[0.1em] uppercase">
-        {label}
-      </div>
-      <div
-        className={`font-mono text-[26px] leading-none font-medium ${
-          winning ? "text-ledger" : "text-ink"
-        } ${value === null ? "text-faint" : ""}`}
-      >
-        {value ?? "—"}
-      </div>
-    </div>
+    <Card size="sm">
+      <CardHeader className="gap-1.5">
+        <CardDescription className="text-[11px] font-medium tracking-[0.1em] uppercase">
+          {label}
+        </CardDescription>
+        {loading ? (
+          <Skeleton className="h-6 w-8" />
+        ) : (
+          <CardTitle
+            className={`font-mono text-[26px] leading-none font-medium ${
+              value === undefined
+                ? "text-faint"
+                : winning
+                  ? "text-ledger"
+                  : "text-foreground"
+            }`}
+          >
+            {value ?? "—"}
+          </CardTitle>
+        )}
+      </CardHeader>
+    </Card>
   );
 }

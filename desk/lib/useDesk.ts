@@ -10,6 +10,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 
 import type {
   DecidableAction,
@@ -20,6 +21,7 @@ import type {
   Metrics,
   PolicyRow,
   QueueRow,
+  Source,
 } from "./api-types";
 import {
   ApiError,
@@ -33,6 +35,9 @@ import {
   workException,
 } from "./api";
 
+/** The five things a person can be looking at. The sidebar is this list. */
+export type View = "queue" | "exception" | "policies" | "audit" | "settings";
+
 /** One live investigation: whose it is, and everything it has emitted so far. */
 interface LiveRun {
   id: string;
@@ -41,7 +46,28 @@ interface LiveRun {
 
 export type Pending = "work" | "decide" | "reset" | null;
 
+/**
+ * One line of the audit trail: a fact that was observed, a decision that was
+ * recorded, or a rule that was learned. Assembled from what the API returned —
+ * every field below is copied off an engine object, never computed here.
+ */
+export interface AuditEntry {
+  key: string;
+  at: string;
+  kind: "fact" | "decision" | "policy";
+  exceptionId: string;
+  subject: string;
+  what: string;
+  source: Source | null;
+  locator: string | null;
+  by: string;
+  screenshot: string | null;
+  auto: boolean;
+}
+
 export interface Desk {
+  view: View;
+  setView: (view: View) => void;
   queue: QueueRow[];
   selectedId: string | null;
   detail: ExceptionDetail | null;
@@ -53,6 +79,9 @@ export interface Desk {
   runningId: string | null;
   policies: PolicyRow[];
   metrics: Metrics | null;
+  /** Every fact, decision and rule across every exception, oldest first. */
+  audit: AuditEntry[];
+  auditLoading: boolean;
   approver: string;
   setApprover: (name: string) => void;
   /** The rule the last approval created, so its card can announce itself. */
@@ -76,6 +105,7 @@ function say(failure: unknown): string {
 }
 
 export function useDesk(): Desk {
+  const [view, setView] = useState<View>("queue");
   const [queue, setQueue] = useState<QueueRow[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<ExceptionDetail | null>(null);
@@ -83,6 +113,8 @@ export function useDesk(): Desk {
   const [runningId, setRunningId] = useState<string | null>(null);
   const [policies, setPolicies] = useState<PolicyRow[]>([]);
   const [metrics, setMetrics] = useState<Metrics | null>(null);
+  const [audit, setAudit] = useState<AuditEntry[]>([]);
+  const [auditLoading, setAuditLoading] = useState(false);
   const [approver, setApprover] = useState(DEFAULT_APPROVER);
   const [learned, setLearned] = useState<string | null>(null);
   const [pending, setPending] = useState<Pending>(null);
@@ -149,10 +181,38 @@ export function useDesk(): Desk {
     };
   }, [loadBoard, loadDetail]);
 
+  /* -------------------------------------------------------------------- audit */
+
+  // The trail spans every exception, so it needs every pack. The board is five
+  // rows, so five reads — and it is re-read whenever the counters move, which is
+  // exactly when something new has happened to record.
+  useEffect(() => {
+    if (view !== "audit" || queue.length === 0) return;
+    let alive = true;
+    const read = async () => {
+      setAuditLoading(true);
+      try {
+        const details = await Promise.all(
+          queue.map((row) => getException(row.exception.id)),
+        );
+        if (alive) setAudit(trail(details, policies));
+      } catch (failure) {
+        if (alive) setError(say(failure));
+      } finally {
+        if (alive) setAuditLoading(false);
+      }
+    };
+    void read();
+    return () => {
+      alive = false;
+    };
+  }, [view, queue, policies]);
+
   /* ---------------------------------------------------------------- selecting */
 
   const select = useCallback(
     (id: string) => {
+      setView("exception");
       if (id === selectedRef.current) return;
       selectedRef.current = id;
       setSelectedId(id);
@@ -171,6 +231,7 @@ export function useDesk(): Desk {
       setError(null);
       setLearned(null);
       setPending("work");
+      setView("exception");
       selectedRef.current = id;
       setSelectedId(id);
       setDetail(null);
@@ -201,12 +262,18 @@ export function useDesk(): Desk {
         };
 
         closeStream.current = streamException(id, {
-          onEvent: (event) =>
+          onEvent: (event) => {
+            if (event.kind === "auto_cleared" && event.decision?.cited_policy) {
+              toast.success(`${id} cleared itself`, {
+                description: `${event.decision.cited_policy} · ${event.decision.approved_by}. Nobody was asked.`,
+              });
+            }
             setRun((current) =>
               current && current.id === id
                 ? { id, events: [...current.events, event] }
                 : current,
-            ),
+            );
+          },
           onDone: (done) =>
             finish(done.state === "failed" ? done.error : undefined),
           onError: (message) => finish(message),
@@ -237,6 +304,11 @@ export function useDesk(): Desk {
           const answer = await decideException(id, { action, by, note });
           setLearned(answer.policy?.ref ?? null);
           setRun(null);
+          if (answer.policy) {
+            toast.success(`${answer.policy.ref} learned`, {
+              description: `${answer.policy.name} — approved by ${answer.policy.approved_by}.`,
+            });
+          }
           await Promise.all([loadBoard(), loadDetail(id)]);
         } catch (failure) {
           setError(say(failure));
@@ -264,11 +336,16 @@ export function useDesk(): Desk {
         setRunningId(null);
         setLearned(null);
         setDetail(null);
+        setAudit([]);
         const rows = await loadBoard();
         const first = rows[0]?.exception.id ?? null;
         selectedRef.current = first;
         setSelectedId(first);
         if (first) await loadDetail(first);
+        toast.success("Back to the seed", {
+          description:
+            "The world, the learned rules, the saved portal session and the screenshots are all as they started.",
+        });
       } catch (failure) {
         setError(say(failure));
       } finally {
@@ -321,6 +398,8 @@ export function useDesk(): Desk {
   const dismissError = useCallback(() => setError(null), []);
 
   return {
+    view,
+    setView,
     queue,
     selectedId,
     detail,
@@ -330,6 +409,8 @@ export function useDesk(): Desk {
     runningId,
     policies,
     metrics,
+    audit,
+    auditLoading,
     approver,
     setApprover,
     learned,
@@ -343,4 +424,70 @@ export function useDesk(): Desk {
     decide,
     reset,
   };
+}
+
+/**
+ * Every fact, decision and rule in the order they happened.
+ *
+ * Flattening, not deriving: each line carries the timestamp the engine wrote on
+ * the object it came from, and the sort is on that timestamp alone.
+ */
+function trail(details: ExceptionDetail[], policies: PolicyRow[]): AuditEntry[] {
+  const entries: AuditEntry[] = [];
+
+  for (const found of details) {
+    const id = found.exception.id;
+    const invoice = found.exception.invoice_id;
+
+    for (const fact of found.pack?.facts ?? []) {
+      entries.push({
+        key: `fact:${fact.id}`,
+        at: fact.observed_at,
+        kind: "fact",
+        exceptionId: id,
+        subject: invoice,
+        what: fact.statement,
+        source: fact.source,
+        locator: fact.locator,
+        by: fact.extracted_by,
+        screenshot: fact.screenshot,
+        auto: false,
+      });
+    }
+
+    const decision = found.decision;
+    if (decision) {
+      entries.push({
+        key: `decision:${id}:${decision.decided_at}`,
+        at: decision.decided_at,
+        kind: "decision",
+        exceptionId: id,
+        subject: invoice,
+        what: decision.summary,
+        source: null,
+        locator: decision.cited_policy,
+        by: decision.approved_by ?? decision.rationale_by,
+        screenshot: null,
+        auto: decision.auto,
+      });
+    }
+  }
+
+  for (const row of policies) {
+    entries.push({
+      key: `policy:${row.policy.ref}`,
+      at: row.policy.approved_at,
+      kind: "policy",
+      exceptionId: row.policy.learned_from,
+      subject: row.policy.learned_from_invoice,
+      what: `${row.policy.ref} — ${row.policy.name}`,
+      source: null,
+      locator: null,
+      by: row.policy.approved_by,
+      screenshot: null,
+      auto: false,
+    });
+  }
+
+  return entries.sort((a, b) => a.at.localeCompare(b.at));
 }
