@@ -10,6 +10,9 @@ import type { NextConfig } from "next";
  */
 const nextConfig: NextConfig = {
   devIndicators: false,
+  // Docker: ship a self-contained server instead of the whole node_modules tree.
+  // Harmless locally — `next dev` ignores it.
+  output: "standalone",
 };
 
 export default nextConfig;

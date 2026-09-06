@@ -13,3 +13,6 @@ node_modules/
 out/
 .DS_Store
 *.egg-info/
+
+# Video working files - voiceovers, takes and renders. Big, and not source.
+video/
