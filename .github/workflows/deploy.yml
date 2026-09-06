@@ -8,6 +8,14 @@ name: Build and deploy
 # Two apps, because Tieout is two services:
 #   tieout       the API + the fake company + the browser
 #   tieout-desk  the Next.js screen
+#
+# The dashboard's git deploy works too — both apps are set to build from a
+# Dockerfile (`builder-dockerfile:set <app> dockerfile-path`), so Dokku no longer
+# tries to guess a buildpack from a repo root that has no language marker in it.
+# This workflow is the faster path: the API image carries Chromium, and GitHub's
+# runners build it in a fraction of the time the VPS would.
+#
+# The deploy key is `revlio_vps` — the same one the other apps on that host use.
 
 on:
   push:

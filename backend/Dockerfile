@@ -25,12 +25,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# Paths are repo-root relative: Dokku builds with the repo root as context.
 # Dependencies first so a code edit does not reinstall the world.
-COPY pyproject.toml README.md ./
+COPY backend/pyproject.toml backend/README.md ./
 RUN pip install --no-cache-dir .
 
 # Then the source, and the project itself.
-COPY src ./src
+COPY backend/src ./src
 RUN pip install --no-cache-dir --no-deps .
 
 RUN mkdir -p /data/tieout

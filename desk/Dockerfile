@@ -6,7 +6,7 @@
 # can be repointed from the browser.
 FROM public.ecr.aws/docker/library/node:22-slim AS deps
 WORKDIR /app
-COPY package.json package-lock.json ./
+COPY desk/package.json desk/package-lock.json ./
 RUN npm ci
 
 FROM public.ecr.aws/docker/library/node:22-slim AS build
@@ -15,7 +15,7 @@ ARG NEXT_PUBLIC_API_BASE
 ENV NEXT_PUBLIC_API_BASE=$NEXT_PUBLIC_API_BASE \
     NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /app/node_modules ./node_modules
-COPY . .
+COPY desk/ .
 RUN npm run build
 
 # `output: standalone` is set in next.config.ts so this stage copies a self-contained
